@@ -267,28 +267,10 @@ public class MinimalECIInput implements ECIInput {
     InputEdge[][] edges = new InputEdge[inputLength + 1][encoderSet.length()];
     addEdges(stringToEncode, encoderSet, edges, 0, null, fnc1);
 
-    for (int i = 1; i <= inputLength; i++) {
-      for (int j = 0; j < encoderSet.length(); j++) {
-        if (edges[i][j] != null && i < inputLength) {
-          addEdges(stringToEncode, encoderSet, edges, i, edges[i][j], fnc1);
-        }
-      }
-      //optimize memory by removing edges that have been passed.
-      for (int j = 0; j < encoderSet.length(); j++) {
-        edges[i - 1][j] = null;
-      }
-    }
+    minimalECIInputRefactor2(stringToEncode, encoderSet, fnc1, inputLength, edges);
     int minimalJ = -1;
     int minimalSize = Integer.MAX_VALUE;
-    for (int j = 0; j < encoderSet.length(); j++) {
-      if (edges[inputLength][j] != null) {
-        InputEdge edge = edges[inputLength][j];
-        if (edge.cachedTotalSize < minimalSize) {
-          minimalSize = edge.cachedTotalSize;
-          minimalJ = j;
-        }
-      }
-    }
+    minimalJ = minimalECIInputRefactor1(encoderSet, inputLength, edges, minimalJ, minimalSize);
     if (minimalJ < 0) {
       throw new RuntimeException("Internal error: failed to encode \"" + stringToEncode + "\"");
     }
@@ -315,6 +297,35 @@ public class MinimalECIInput implements ECIInput {
     }
     return ints;
   }
+
+private static void minimalECIInputRefactor2(String stringToEncode, ECIEncoderSet encoderSet, int fnc1, int inputLength,
+		InputEdge[][] edges) {
+	for (int i = 1; i <= inputLength; i++) {
+      for (int j = 0; j < encoderSet.length(); j++) {
+        if (edges[i][j] != null && i < inputLength) {
+          addEdges(stringToEncode, encoderSet, edges, i, edges[i][j], fnc1);
+        }
+      }
+      //optimize memory by removing edges that have been passed.
+      for (int j = 0; j < encoderSet.length(); j++) {
+        edges[i - 1][j] = null;
+      }
+    }
+}
+
+private static int minimalECIInputRefactor1(ECIEncoderSet encoderSet, int inputLength, InputEdge[][] edges,
+		int minimalJ, int minimalSize) {
+	for (int j = 0; j < encoderSet.length(); j++) {
+      if (edges[inputLength][j] != null) {
+        InputEdge edge = edges[inputLength][j];
+        if (edge.cachedTotalSize < minimalSize) {
+          minimalSize = edge.cachedTotalSize;
+          minimalJ = j;
+        }
+      }
+    }
+	return minimalJ;
+}
 
   private static final class InputEdge {
     private final char c;

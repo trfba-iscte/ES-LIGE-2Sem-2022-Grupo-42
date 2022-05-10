@@ -48,17 +48,7 @@ public final class DataMatrixWriter implements Writer {
   @Override
   public BitMatrix encode(String contents, BarcodeFormat format, int width, int height, Map<EncodeHintType,?> hints) {
 
-    if (contents.isEmpty()) {
-      throw new IllegalArgumentException("Found empty contents");
-    }
-
-    if (format != BarcodeFormat.DATA_MATRIX) {
-      throw new IllegalArgumentException("Can only encode DATA_MATRIX, but got " + format);
-    }
-
-    if (width < 0 || height < 0) {
-      throw new IllegalArgumentException("Requested dimensions can't be negative: " + width + 'x' + height);
-    }
+    encodeDataMatrixWriteRefactor2(contents, format, width, height);
 
     // Try to get force shape & min / max size
     SymbolShapeHint shape = SymbolShapeHint.FORCE_NONE;
@@ -87,7 +77,40 @@ public final class DataMatrixWriter implements Writer {
 
     boolean hasCompactionHint = hints != null && hints.containsKey(EncodeHintType.DATA_MATRIX_COMPACT) &&
         Boolean.parseBoolean(hints.get(EncodeHintType.DATA_MATRIX_COMPACT).toString());
-    if (hasCompactionHint) {
+    encoded = encodeDataMatrixRefactor(contents, hints, shape, minSize, maxSize, hasCompactionHint);
+
+    SymbolInfo symbolInfo = SymbolInfo.lookup(encoded.length(), shape, minSize, maxSize, true);
+
+    //2. step: ECC generation
+    String codewords = ErrorCorrection.encodeECC200(encoded, symbolInfo);
+
+    //3. step: Module placement in Matrix
+    DefaultPlacement placement =
+        new DefaultPlacement(codewords, symbolInfo.getSymbolDataWidth(), symbolInfo.getSymbolDataHeight());
+    placement.place();
+
+    //4. step: low-level encoding
+    return encodeLowLevel(placement, symbolInfo, width, height);
+  }
+
+private void encodeDataMatrixWriteRefactor2(String contents, BarcodeFormat format, int width, int height) {
+	if (contents.isEmpty()) {
+      throw new IllegalArgumentException("Found empty contents");
+    }
+
+    if (format != BarcodeFormat.DATA_MATRIX) {
+      throw new IllegalArgumentException("Can only encode DATA_MATRIX, but got " + format);
+    }
+
+    if (width < 0 || height < 0) {
+      throw new IllegalArgumentException("Requested dimensions can't be negative: " + width + 'x' + height);
+    }
+}
+
+private String encodeDataMatrixRefactor(String contents, Map<EncodeHintType, ?> hints, SymbolShapeHint shape,
+		Dimension minSize, Dimension maxSize, boolean hasCompactionHint) {
+	String encoded;
+	if (hasCompactionHint) {
 
       boolean hasGS1FormatHint = hints.containsKey(EncodeHintType.GS1_FORMAT) &&
           Boolean.parseBoolean(hints.get(EncodeHintType.GS1_FORMAT).toString());
@@ -103,20 +126,8 @@ public final class DataMatrixWriter implements Writer {
           Boolean.parseBoolean(hints.get(EncodeHintType.FORCE_C40).toString());
       encoded = HighLevelEncoder.encodeHighLevel(contents, shape, minSize, maxSize, hasForceC40Hint);
     }
-
-    SymbolInfo symbolInfo = SymbolInfo.lookup(encoded.length(), shape, minSize, maxSize, true);
-
-    //2. step: ECC generation
-    String codewords = ErrorCorrection.encodeECC200(encoded, symbolInfo);
-
-    //3. step: Module placement in Matrix
-    DefaultPlacement placement =
-        new DefaultPlacement(codewords, symbolInfo.getSymbolDataWidth(), symbolInfo.getSymbolDataHeight());
-    placement.place();
-
-    //4. step: low-level encoding
-    return encodeLowLevel(placement, symbolInfo, width, height);
-  }
+	return encoded;
+}
 
   /**
    * Encode the given symbol info to a bit matrix.
