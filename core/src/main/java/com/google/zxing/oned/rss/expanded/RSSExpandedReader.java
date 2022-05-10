@@ -55,7 +55,8 @@ import java.util.Collections;
  */
 public final class RSSExpandedReader extends AbstractRSSReader {
 
-  private static final int[] SYMBOL_WIDEST = {7, 5, 4, 3, 1};
+  private RSSExpandedReaderProduct rSSExpandedReaderProduct = new RSSExpandedReaderProduct();
+private static final int[] SYMBOL_WIDEST = {7, 5, 4, 3, 1};
   private static final int[] EVEN_TOTAL_SUBSET = {4, 20, 52, 104, 204};
   private static final int[] GSUM = {0, 348, 1388, 2948, 3988};
 
@@ -468,10 +469,7 @@ public final class RSSExpandedReader extends AbstractRSSReader {
       ExpandedPair lastPair = previousPairs.get(previousPairs.size() - 1);
       rowOffset = lastPair.getFinderPattern().getStartEnd()[1];
     }
-    boolean searchingEvenPair = previousPairs.size() % 2 != 0;
-    if (startFromEven) {
-      searchingEvenPair = !searchingEvenPair;
-    }
+    boolean searchingEvenPair = RSSExpandedReader1(previousPairs);
 
     boolean isWhite = false;
     while (rowOffset < width) {
@@ -484,7 +482,13 @@ public final class RSSExpandedReader extends AbstractRSSReader {
 
     int counterPosition = 0;
     int patternStart = rowOffset;
-    for (int x = rowOffset; x < width; x++) {
+    RSSExpandedReader2(row, counters, width, rowOffset, searchingEvenPair, isWhite, counterPosition, patternStart);
+    throw NotFoundException.getNotFoundInstance();
+  }
+
+private void RSSExpandedReader2(BitArray row, int[] counters, int width, int rowOffset, boolean searchingEvenPair,
+		boolean isWhite, int counterPosition, int patternStart) {
+	for (int x = rowOffset; x < width; x++) {
       if (row.get(x) != isWhite) {
         counters[counterPosition]++;
       } else {
@@ -516,8 +520,15 @@ public final class RSSExpandedReader extends AbstractRSSReader {
         isWhite = !isWhite;
       }
     }
-    throw NotFoundException.getNotFoundInstance();
-  }
+}
+
+private boolean RSSExpandedReader1(List<ExpandedPair> previousPairs) {
+	boolean searchingEvenPair = previousPairs.size() % 2 != 0;
+    if (startFromEven) {
+      searchingEvenPair = !searchingEvenPair;
+    }
+	return searchingEvenPair;
+}
 
   private static void reverseCounters(int [] counters) {
     int length = counters.length;
@@ -575,7 +586,9 @@ public final class RSSExpandedReader extends AbstractRSSReader {
                                     FinderPattern pattern,
                                     boolean isOddPattern,
                                     boolean leftChar) throws NotFoundException {
-    int[] counters = this.getDataCharacterCounters();
+    int evenChecksumPortion = RSSExpandedReader2(pattern, isOddPattern, leftChar);
+	int oddChecksumPortion = RSSExpandedReader3(pattern, isOddPattern, leftChar);
+	int[] counters = this.getDataCharacterCounters();
     Arrays.fill(counters, 0);
 
     if (leftChar) {
@@ -584,9 +597,7 @@ public final class RSSExpandedReader extends AbstractRSSReader {
       recordPattern(row, pattern.getStartEnd()[1], counters);
       // reverse it
       for (int i = 0, j = counters.length - 1; i < j; i++, j--) {
-        int temp = counters[i];
-        counters[i] = counters[j];
-        counters[j] = temp;
+        counters = RSSExpandedReader1(counters, i, j);
       }
     } //counters[] has the pixels of the module
 
@@ -604,49 +615,25 @@ public final class RSSExpandedReader extends AbstractRSSReader {
     float[] oddRoundingErrors = this.getOddRoundingErrors();
     float[] evenRoundingErrors = this.getEvenRoundingErrors();
 
-    for (int i = 0; i < counters.length; i++) {
-      float value = 1.0f * counters[i] / elementWidth;
+    evenCounts = rSSExpandedReaderProduct.RSSExpandedReader5(counters, elementWidth, evenCounts);
+	for (int i = 0; i < counters.length; i++) {
+      oddCounts = rSSExpandedReaderProduct.RSSExpandedReader4(counters, elementWidth, oddCounts, i);
+	float value = 1.0f * counters[i] / elementWidth;
       int count = (int) (value + 0.5f); // Round
-      if (count < 1) {
-        if (value < 0.3f) {
-          throw NotFoundException.getNotFoundInstance();
-        }
-        count = 1;
-      } else if (count > 8) {
-        if (value > 8.7f) {
-          throw NotFoundException.getNotFoundInstance();
-        }
-        count = 8;
-      }
-      int offset = i / 2;
+      count = rSSExpandedReaderProduct.RSSExpandedReader1(value, count);
+      evenRoundingErrors = RSSExpandedReader6(evenRoundingErrors, i, value, count);
+	int offset = i / 2;
       if ((i & 0x01) == 0) {
-        oddCounts[offset] = count;
         oddRoundingErrors[offset] = value - count;
       } else {
-        evenCounts[offset] = count;
-        evenRoundingErrors[offset] = value - count;
       }
     }
 
     adjustOddEvenCounts(numModules);
 
-    int weightRowNumber = 4 * pattern.getValue() + (isOddPattern ? 0 : 2) + (leftChar ? 0 : 1) - 1;
-
     int oddSum = 0;
-    int oddChecksumPortion = 0;
     for (int i = oddCounts.length - 1; i >= 0; i--) {
-      if (isNotA1left(pattern, isOddPattern, leftChar)) {
-        int weight = WEIGHTS[weightRowNumber][2 * i];
-        oddChecksumPortion += oddCounts[i] * weight;
-      }
       oddSum += oddCounts[i];
-    }
-    int evenChecksumPortion = 0;
-    for (int i = evenCounts.length - 1; i >= 0; i--) {
-      if (isNotA1left(pattern, isOddPattern, leftChar)) {
-        int weight = WEIGHTS[weightRowNumber][2 * i + 1];
-        evenChecksumPortion += evenCounts[i] * weight;
-      }
     }
     int checksumPortion = oddChecksumPortion + evenChecksumPortion;
 
@@ -665,6 +652,86 @@ public final class RSSExpandedReader extends AbstractRSSReader {
 
     return new DataCharacter(value, checksumPortion);
   }
+
+private float[] RSSExpandedReader6(float[] evenRoundingErrors, int i, float value, int count) {
+	int offset = i / 2;
+	if ((i & 0x01) == 0) {
+	} else {
+		evenRoundingErrors[offset] = value - count;
+	}
+	return evenRoundingErrors;
+}
+
+private int RSSExpandedReader3(FinderPattern pattern, boolean isOddPattern, boolean leftChar) throws NotFoundException {
+	int[] counters = this.getDataCharacterCounters();
+	if (leftChar) {
+	} else {
+		for (int i = 0, j = counters.length - 1; i < j; i++, j--) {
+			counters = RSSExpandedReader1(counters, i, j);
+		}
+	}
+	int numModules = 17;
+	float elementWidth = MathUtils.sum(counters) / (float) numModules;
+	int[] oddCounts = this.getOddCounts();
+	for (int i = 0; i < counters.length; i++) {
+		float value = 1.0f * counters[i] / elementWidth;
+		int count = (int) (value + 0.5f);
+		count = rSSExpandedReaderProduct.RSSExpandedReader1(value, count);
+		int offset = i / 2;
+		if ((i & 0x01) == 0) {
+			oddCounts[offset] = count;
+		} else {
+		}
+	}
+	int weightRowNumber = 4 * pattern.getValue() + (isOddPattern ? 0 : 2) + (leftChar ? 0 : 1) - 1;
+	int oddChecksumPortion = 0;
+	for (int i = oddCounts.length - 1; i >= 0; i--) {
+		if (isNotA1left(pattern, isOddPattern, leftChar)) {
+			int weight = WEIGHTS[weightRowNumber][2 * i];
+			oddChecksumPortion += oddCounts[i] * weight;
+		}
+	}
+	return oddChecksumPortion;
+}
+
+private int RSSExpandedReader2(FinderPattern pattern, boolean isOddPattern, boolean leftChar) throws NotFoundException {
+	int[] counters = this.getDataCharacterCounters();
+	if (leftChar) {
+	} else {
+		for (int i = 0, j = counters.length - 1; i < j; i++, j--) {
+			counters = RSSExpandedReader1(counters, i, j);
+		}
+	}
+	int numModules = 17;
+	float elementWidth = MathUtils.sum(counters) / (float) numModules;
+	int[] evenCounts = this.getEvenCounts();
+	for (int i = 0; i < counters.length; i++) {
+		float value = 1.0f * counters[i] / elementWidth;
+		int count = (int) (value + 0.5f);
+		count = rSSExpandedReaderProduct.RSSExpandedReader1(value, count);
+		int offset = i / 2;
+		if ((i & 0x01) == 0) {
+		} else {
+			evenCounts[offset] = count;
+		}
+	}
+	int weightRowNumber = 4 * pattern.getValue() + (isOddPattern ? 0 : 2) + (leftChar ? 0 : 1) - 1;
+	int evenChecksumPortion = 0;
+	for (int i = evenCounts.length - 1; i >= 0; i--) {
+		if (isNotA1left(pattern, isOddPattern, leftChar)) {
+			int weight = WEIGHTS[weightRowNumber][2 * i + 1];
+			evenChecksumPortion += evenCounts[i] * weight;
+		}
+	}
+	return evenChecksumPortion;
+}
+
+private int[] RSSExpandedReader1(int[] counters, int i, int j) {
+	int temp = counters[i];
+	counters[i] = counters[j];
+	counters[j] = temp;
+	return counters;
+}
 
   private static boolean isNotA1left(FinderPattern pattern, boolean isOddPattern, boolean leftChar) {
     // A1: pattern.getValue is 0 (A), and it's an oddPattern, and it is a left char

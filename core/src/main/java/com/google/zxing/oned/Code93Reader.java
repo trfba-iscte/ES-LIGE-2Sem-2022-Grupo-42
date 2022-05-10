@@ -53,7 +53,7 @@ public final class Code93Reader extends OneDReader {
       0x12E, 0x1D4, 0x1D2, 0x1CA, 0x16E, 0x176, 0x1AE, // - - %
       0x126, 0x1DA, 0x1D6, 0x132, 0x15E, // Control chars? $-*
   };
-  static final int ASTERISK_ENCODING = CHARACTER_ENCODINGS[47];
+  public static final int ASTERISK_ENCODING = CHARACTER_ENCODINGS[47];
 
   private final StringBuilder decodeRowResult;
   private final int[] counters;
@@ -67,7 +67,7 @@ public final class Code93Reader extends OneDReader {
   public Result decodeRow(int rowNumber, BitArray row, Map<DecodeHintType,?> hints)
       throws NotFoundException, ChecksumException, FormatException {
 
-    int[] start = findAsteriskPattern(row);
+    int[] start = row.findAsteriskPattern(counters);
     // Read off white space
     int nextStart = row.getNextSet(start[1]);
     int end = row.getSize();
@@ -131,41 +131,7 @@ public final class Code93Reader extends OneDReader {
     return resultObject;
   }
 
-  private int[] findAsteriskPattern(BitArray row) throws NotFoundException {
-    int width = row.getSize();
-    int rowOffset = row.getNextSet(0);
-
-    Arrays.fill(counters, 0);
-    int[] theCounters = counters;
-    int patternStart = rowOffset;
-    boolean isWhite = false;
-    int patternLength = theCounters.length;
-
-    int counterPosition = 0;
-    for (int i = rowOffset; i < width; i++) {
-      if (row.get(i) != isWhite) {
-        theCounters[counterPosition]++;
-      } else {
-        if (counterPosition == patternLength - 1) {
-          if (toPattern(theCounters) == ASTERISK_ENCODING) {
-            return new int[]{patternStart, i};
-          }
-          patternStart += theCounters[0] + theCounters[1];
-          System.arraycopy(theCounters, 2, theCounters, 0, counterPosition - 1);
-          theCounters[counterPosition - 1] = 0;
-          theCounters[counterPosition] = 0;
-          counterPosition--;
-        } else {
-          counterPosition++;
-        }
-        theCounters[counterPosition] = 1;
-        isWhite = !isWhite;
-      }
-    }
-    throw NotFoundException.getNotFoundInstance();
-  }
-
-  private static int toPattern(int[] counters) {
+  public static int toPattern(int[] counters) {
     int sum = 0;
     for (int counter : counters) {
       sum += counter;

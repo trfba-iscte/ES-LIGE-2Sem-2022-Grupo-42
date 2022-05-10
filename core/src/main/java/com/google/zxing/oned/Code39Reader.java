@@ -140,31 +140,15 @@ public final class Code39Reader extends OneDReader {
       throw NotFoundException.getNotFoundInstance();
     }
 
-    if (usingCheckDigit) {
-      int max = result.length() - 1;
-      int total = 0;
-      for (int i = 0; i < max; i++) {
-        total += ALPHABET_STRING.indexOf(decodeRowResult.charAt(i));
-      }
-      if (result.charAt(max) != ALPHABET_STRING.charAt(total % 43)) {
-        throw ChecksumException.getChecksumInstance();
-      }
-      result.setLength(max);
-    }
+    Code39Reader2(result);
 
     if (result.length() == 0) {
       // false positive
       throw NotFoundException.getNotFoundInstance();
     }
 
-    String resultString;
-    if (extendedMode) {
-      resultString = decodeExtended(result);
-    } else {
-      resultString = result.toString();
-    }
-
-    float left = (start[1] + start[0]) / 2.0f;
+    String resultString = Code39Reader1(result);
+	float left = (start[1] + start[0]) / 2.0f;
     float right = lastStart + lastPatternSize / 2.0f;
 
     Result resultObject = new Result(
@@ -177,6 +161,30 @@ public final class Code39Reader extends OneDReader {
     resultObject.putMetadata(ResultMetadataType.SYMBOLOGY_IDENTIFIER, "]A0");
     return resultObject;
   }
+
+private void Code39Reader2(StringBuilder result) throws ChecksumException {
+	if (usingCheckDigit) {
+      int max = result.length() - 1;
+      int total = 0;
+      for (int i = 0; i < max; i++) {
+        total += ALPHABET_STRING.indexOf(decodeRowResult.charAt(i));
+      }
+      if (result.charAt(max) != ALPHABET_STRING.charAt(total % 43)) {
+        throw ChecksumException.getChecksumInstance();
+      }
+      result.setLength(max);
+    }
+}
+
+private String Code39Reader1(StringBuilder result) throws FormatException {
+	String resultString;
+	if (extendedMode) {
+		resultString = decodeExtended(result);
+	} else {
+		resultString = result.toString();
+	}
+	return resultString;
+}
 
   private static int[] findAsteriskPattern(BitArray row, int[] counters) throws NotFoundException {
     int width = row.getSize();
@@ -221,9 +229,7 @@ public final class Code39Reader extends OneDReader {
     do {
       int minCounter = Integer.MAX_VALUE;
       for (int counter : counters) {
-        if (counter < minCounter && counter > maxNarrowCounter) {
-          minCounter = counter;
-        }
+        minCounter = CodaBarReader1(maxNarrowCounter, minCounter, counter);
       }
       maxNarrowCounter = minCounter;
       wideCounters = 0;
@@ -256,6 +262,13 @@ public final class Code39Reader extends OneDReader {
     } while (wideCounters > 3);
     return -1;
   }
+
+private static int CodaBarReader1(int maxNarrowCounter, int minCounter, int counter) {
+	if (counter < minCounter && counter > maxNarrowCounter) {
+		minCounter = counter;
+	}
+	return minCounter;
+}
 
   private static char patternToChar(int pattern) throws NotFoundException {
     for (int i = 0; i < CHARACTER_ENCODINGS.length; i++) {

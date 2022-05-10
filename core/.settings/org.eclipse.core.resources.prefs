@@ -1,5 +1,6 @@
 eclipse.preferences.version=1
 encoding//src/main/java=UTF-8
+encoding//src/main/java/com/google/zxing/oned/rss/expanded/RSSExpandedReaderProduct.java=UTF-8
 encoding//src/main/java/com/google/zxing/common/detector/MonochromeRectangleDetectorProduct.java=UTF-8
 encoding//src/main/java/com/google/zxing/common/detector/WhiteRectangleDetectorProduct.java=UTF-8
 encoding//src/main/java/com/google/zxing/common/detector/WhiteRectangleDetectorProduct2.java=UTF-8
