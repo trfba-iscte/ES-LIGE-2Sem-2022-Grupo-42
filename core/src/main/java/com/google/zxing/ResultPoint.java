@@ -16,6 +16,8 @@
 
 package com.google.zxing;
 
+import com.google.zxing.aztec.detector.Detector;
+import com.google.zxing.common.BitMatrix;
 import com.google.zxing.common.detector.MathUtils;
 
 /**
@@ -126,5 +128,34 @@ public class ResultPoint {
     float bY = pointB.y;
     return ((pointC.x - bX) * (pointA.y - bY)) - ((pointC.y - bY) * (pointA.x - bX));
   }
+
+/**
+ * Samples a line.
+ * @param p2    end point (exclusive)
+ * @param size  number of bits
+ * @param image
+ * @return  the array of bits as an int (first bit is high-order bit of result)
+ */
+public int sampleLineRefactorEnvy(ResultPoint p2, int size, BitMatrix image) {
+	int result = 0;
+	float d = Detector.distance(this, p2);
+	float moduleSize = d / size;
+	float px = getX();
+	float py = getY();
+	float dx = moduleSize * (p2.getX() - getX()) / d;
+	float dy = moduleSize * (p2.getY() - getY()) / d;
+	for (int i = 0; i < size; i++) {
+		if (image.get(MathUtils.round(px + i * dx), MathUtils.round(py + i * dy))) {
+			result |= 1 << (size - i - 1);
+		}
+	}
+	return result;
+}
+
+public boolean isValidRefactorEnvy(BitMatrix image) {
+	int x = MathUtils.round(getX());
+	int y = MathUtils.round(getY());
+	return image.isValidRefactorEnvy(x, y);
+}
 
 }

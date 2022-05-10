@@ -84,4 +84,13 @@ public abstract class Binarizer {
     return source.getHeight();
   }
 
+/**
+ * Returns a new object with rotated image data by 45 degrees counterclockwise. Only callable if  {@link #isRotateSupported()}  is true.
+ * @return  A rotated version of this object.
+ */
+  public BinaryBitmap rotateCounterClockwise45() {
+	LuminanceSource newSource = getLuminanceSource().rotateCounterClockwise45();
+	return new BinaryBitmap(createBinarizer(newSource));
+}
+
 }

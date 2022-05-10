@@ -124,31 +124,18 @@ public abstract class GridSampler {
     boolean nudged = true;
     int maxOffset = points.length - 1; // points.length must be even
     for (int offset = 0; offset < maxOffset && nudged; offset += 2) {
-      int x = (int) points[offset];
-      int y = (int) points[offset + 1];
-      if (x < -1 || x > width || y < -1 || y > height) {
-        throw NotFoundException.getNotFoundInstance();
-      }
-      nudged = false;
-      if (x == -1) {
-        points[offset] = 0.0f;
-        nudged = true;
-      } else if (x == width) {
-        points[offset] = width - 1;
-        nudged = true;
-      }
-      if (y == -1) {
-        points[offset + 1] = 0.0f;
-        nudged = true;
-      } else if (y == height) {
-        points[offset + 1] = height - 1;
-        nudged = true;
-      }
+      nudged = nudgeRefactor(points, width, height, offset);
     }
     // Check and nudge points from end:
     nudged = true;
     for (int offset = points.length - 2; offset >= 0 && nudged; offset -= 2) {
-      int x = (int) points[offset];
+      nudged = nudgeRefactor(points, width, height, offset);
+    }
+  }
+
+private static boolean nudgeRefactor(float[] points, int width, int height, int offset) throws NotFoundException {
+	boolean nudged;
+	int x = (int) points[offset];
       int y = (int) points[offset + 1];
       if (x < -1 || x > width || y < -1 || y > height) {
         throw NotFoundException.getNotFoundInstance();
@@ -168,7 +155,7 @@ public abstract class GridSampler {
         points[offset + 1] = height - 1;
         nudged = true;
       }
-    }
-  }
+	return nudged;
+}
 
 }

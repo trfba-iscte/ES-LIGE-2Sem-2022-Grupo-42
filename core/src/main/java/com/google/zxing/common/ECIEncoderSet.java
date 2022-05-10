@@ -92,35 +92,7 @@ public final class ECIEncoderSet {
     boolean needUnicodeEncoder = priorityCharset != null && priorityCharset.name().startsWith("UTF");
 
     //Walk over the input string and see if all characters can be encoded with the list of encoders 
-    for (int i = 0; i < stringToEncode.length(); i++) {
-      boolean canEncode = false;
-      for (CharsetEncoder encoder : neededEncoders) {
-        char c = stringToEncode.charAt(i);
-        if (c == fnc1 || encoder.canEncode(c)) {
-          canEncode = true;
-          break;
-        }
-      }
-
-      if (!canEncode) {
-        //for the character at position i we don't yet have an encoder in the list
-        for (CharsetEncoder encoder : ENCODERS) {
-          if (encoder.canEncode(stringToEncode.charAt(i))) {
-            //Good, we found an encoder that can encode the character. We add him to the list and continue scanning
-            //the input
-            neededEncoders.add(encoder);
-            canEncode = true;
-            break;
-          }
-        }
-      }
-
-      if (!canEncode) {
-        //The character is not encodeable by any of the single byte encoders so we remember that we will need a
-        //Unicode encoder.
-        needUnicodeEncoder = true;
-      }
-    }
+    needUnicodeEncoder = refactorEncoderSet3(stringToEncode, fnc1, neededEncoders, needUnicodeEncoder);
   
     if (neededEncoders.size() == 1 && !needUnicodeEncoder) {
       //the entire input can be encoded by the ISO-8859-1 encoder
@@ -140,7 +112,31 @@ public final class ECIEncoderSet {
   
     //Compute priorityEncoderIndex by looking up priorityCharset in encoders
     int priorityEncoderIndexValue = -1;
-    if (priorityCharset != null) {
+    priorityEncoderIndexValue = refactorECIEncoderSet2(priorityCharset, priorityEncoderIndexValue);
+    priorityEncoderIndex = priorityEncoderIndexValue;
+    //invariants
+    assert encoders[0].charset().equals(StandardCharsets.ISO_8859_1);
+  }
+
+private boolean refactorEncoderSet3(String stringToEncode, int fnc1, List<CharsetEncoder> neededEncoders,
+		boolean needUnicodeEncoder) {
+	for (int i = 0; i < stringToEncode.length(); i++) {
+      boolean canEncode = false;
+      for (CharsetEncoder encoder : neededEncoders) {
+        char c = stringToEncode.charAt(i);
+        if (c == fnc1 || encoder.canEncode(c)) {
+          canEncode = true;
+          break;
+        }
+      }
+
+      needUnicodeEncoder = refactorECIEncoderSet(stringToEncode, neededEncoders, needUnicodeEncoder, i, canEncode);
+    }
+	return needUnicodeEncoder;
+}
+
+private int refactorECIEncoderSet2(Charset priorityCharset, int priorityEncoderIndexValue) {
+	if (priorityCharset != null) {
       for (int i = 0; i < encoders.length; i++) {
         if (encoders[i] != null && priorityCharset.name().equals(encoders[i].charset().name())) {
           priorityEncoderIndexValue = i;
@@ -148,10 +144,31 @@ public final class ECIEncoderSet {
         }
       }
     }
-    priorityEncoderIndex = priorityEncoderIndexValue;
-    //invariants
-    assert encoders[0].charset().equals(StandardCharsets.ISO_8859_1);
-  }
+	return priorityEncoderIndexValue;
+}
+
+private boolean refactorECIEncoderSet(String stringToEncode, List<CharsetEncoder> neededEncoders,
+		boolean needUnicodeEncoder, int i, boolean canEncode) {
+	if (!canEncode) {
+        //for the character at position i we don't yet have an encoder in the list
+        for (CharsetEncoder encoder : ENCODERS) {
+          if (encoder.canEncode(stringToEncode.charAt(i))) {
+            //Good, we found an encoder that can encode the character. We add him to the list and continue scanning
+            //the input
+            neededEncoders.add(encoder);
+            canEncode = true;
+            break;
+          }
+        }
+      }
+
+      if (!canEncode) {
+        //The character is not encodeable by any of the single byte encoders so we remember that we will need a
+        //Unicode encoder.
+        needUnicodeEncoder = true;
+      }
+	return needUnicodeEncoder;
+}
 
   public int length() {
     return encoders.length;
