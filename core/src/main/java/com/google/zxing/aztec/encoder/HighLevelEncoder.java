@@ -237,7 +237,21 @@ public final class HighLevelEncoder {
     State stateNoBinary = null;
     for (int mode = 0; mode <= MODE_PUNCT; mode++) {
       int charInMode = CHAR_MAP[mode][ch];
-      if (charInMode > 0) {
+      stateNoBinary = updateStateForCharRefactor(state, index, result, charInCurrentTable, stateNoBinary, mode,
+			charInMode);
+    }
+    if (state.getBinaryShiftByteCount() > 0 || CHAR_MAP[state.getMode()][ch] == 0) {
+      // It's never worthwhile to go into binary shift mode if you're not already
+      // in binary shift mode, and the character exists in your current mode.
+      // That can never save bits over just outputting the char in the current mode.
+      State binaryState = state.addBinaryShiftChar(index);
+      result.add(binaryState);
+    }
+  }
+
+private State updateStateForCharRefactor(State state, int index, Collection<State> result, boolean charInCurrentTable,
+		State stateNoBinary, int mode, int charInMode) {
+	if (charInMode > 0) {
         if (stateNoBinary == null) {
           // Only create stateNoBinary the first time it's required.
           stateNoBinary = state.endBinaryShift(index);
@@ -259,15 +273,8 @@ public final class HighLevelEncoder {
           result.add(shiftState);
         }
       }
-    }
-    if (state.getBinaryShiftByteCount() > 0 || CHAR_MAP[state.getMode()][ch] == 0) {
-      // It's never worthwhile to go into binary shift mode if you're not already
-      // in binary shift mode, and the character exists in your current mode.
-      // That can never save bits over just outputting the char in the current mode.
-      State binaryState = state.addBinaryShiftChar(index);
-      result.add(binaryState);
-    }
-  }
+	return stateNoBinary;
+}
 
   private static Collection<State> updateStateListForPair(Iterable<State> states, int index, int pairCode) {
     Collection<State> result = new LinkedList<>();

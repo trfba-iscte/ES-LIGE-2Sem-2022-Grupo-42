@@ -38,9 +38,7 @@ public final class EmailAddressResultParser extends ResultParser {
       // If it starts with mailto:, assume it is definitely trying to be an email address
       String hostEmail = rawText.substring(7);
       int queryStart = hostEmail.indexOf('?');
-      if (queryStart >= 0) {
-        hostEmail = hostEmail.substring(0, queryStart);
-      }
+      hostEmail = parseRefactor2(hostEmail, queryStart);
       try {
         hostEmail = urlDecode(hostEmail);
       } catch (IllegalArgumentException iae) {
@@ -75,11 +73,22 @@ public final class EmailAddressResultParser extends ResultParser {
       }
       return new EmailAddressParsedResult(tos, ccs, bccs, subject, body);
     } else {
-      if (!EmailDoCoMoResultParser.isBasicallyValidEmailAddress(rawText)) {
+      return parseRefactor(rawText);
+    }
+  }
+
+private String parseRefactor2(String hostEmail, int queryStart) {
+	if (queryStart >= 0) {
+        hostEmail = hostEmail.substring(0, queryStart);
+      }
+	return hostEmail;
+}
+
+private EmailAddressParsedResult parseRefactor(String rawText) {
+	if (!EmailDoCoMoResultParser.isBasicallyValidEmailAddress(rawText)) {
         return null;
       }
       return new EmailAddressParsedResult(rawText);
-    }
-  }
+}
 
 }

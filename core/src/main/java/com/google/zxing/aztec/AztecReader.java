@@ -102,20 +102,12 @@ public final class AztecReader implements Reader {
                                BarcodeFormat.AZTEC,
                                System.currentTimeMillis());
 
-    List<byte[]> byteSegments = decoderResult.getByteSegments();
-    if (byteSegments != null) {
-      result.putMetadata(ResultMetadataType.BYTE_SEGMENTS, byteSegments);
-    }
-    String ecLevel = decoderResult.getECLevel();
-    if (ecLevel != null) {
-      result.putMetadata(ResultMetadataType.ERROR_CORRECTION_LEVEL, ecLevel);
-    }
-    result.putMetadata(ResultMetadataType.SYMBOLOGY_IDENTIFIER, "]z" + decoderResult.getSymbologyModifier());
+    decoderResult.AztecReaderRefactorEnvy(result);
 
     return result;
   }
 
-  @Override
+@Override
   public void reset() {
     // do nothing
   }

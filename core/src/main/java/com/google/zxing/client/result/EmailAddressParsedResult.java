@@ -51,10 +51,10 @@ public final class EmailAddressParsedResult extends ParsedResult {
    * @return first elements of {@link #getTos()} or {@code null} if none
    * @deprecated use {@link #getTos()}
    */
-  @Deprecated
-  public String getEmailAddress() {
-    return tos == null || tos.length == 0 ? null : tos[0];
-  }
+//  @Deprecated
+//  private String getEmailAddress() {
+//    return tos == null || tos.length == 0 ? null : tos[0];
+//  }
 
   public String[] getTos() {
     return tos;
@@ -80,10 +80,10 @@ public final class EmailAddressParsedResult extends ParsedResult {
    * @return "mailto:"
    * @deprecated without replacement
    */
-  @Deprecated
-  public String getMailtoURI() {
-    return "mailto:";
-  }
+//  @Deprecated
+//  private String getMailtoURI() {
+//    return "mailto:";
+//  }
 
   @Override
   public String getDisplayResult() {
