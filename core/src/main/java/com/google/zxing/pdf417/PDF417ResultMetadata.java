@@ -38,9 +38,9 @@ public final class PDF417ResultMetadata {
    *
    * @return File segment index
    */
-/*  public int getSegmentIndex() {
+  public int getSegmentIndex() {
     return segmentIndex;
-  }*/
+  }
 
   public void setSegmentIndex(int segmentIndex) {
     this.segmentIndex = segmentIndex;
@@ -92,25 +92,25 @@ public final class PDF417ResultMetadata {
   /**
    * @return count of segments, -1 if not set
    */
- /* public int getSegmentCount() {
+  public int getSegmentCount() {
     return segmentCount;
-  }*/
+  }
 
   public void setSegmentCount(int segmentCount) {
     this.segmentCount = segmentCount;
   }
 
-/*  public String getSender() {
+  public String getSender() {
     return sender;
-  }*/
+  }
 
   public void setSender(String sender) {
     this.sender = sender;
   }
 
- /* public String getAddressee() {
+  public String getAddressee() {
     return addressee;
-  }*/
+  }
 
   public void setAddressee(String addressee) {
     this.addressee = addressee;
@@ -121,9 +121,9 @@ public final class PDF417ResultMetadata {
    *
    * @return filename
    */
-/*  public String getFileName() {
+  public String getFileName() {
     return fileName;
-  }*/
+  }
 
   public void setFileName(String fileName) {
     this.fileName = fileName;
@@ -134,9 +134,9 @@ public final class PDF417ResultMetadata {
    *
    * @return filesize in bytes, -1 if not set
    */
-/*  public long getFileSize() {
+  public long getFileSize() {
     return fileSize;
-  }*/
+  }
 
   public void setFileSize(long fileSize) {
     this.fileSize = fileSize;
@@ -147,9 +147,9 @@ public final class PDF417ResultMetadata {
    *
    * @return crc checksum, -1 if not set
    */
- /* public int getChecksum() {
+  public int getChecksum() {
     return checksum;
-  }*/
+  }
 
   public void setChecksum(int checksum) {
     this.checksum = checksum;
@@ -160,9 +160,9 @@ public final class PDF417ResultMetadata {
    *
    * @return elapsed seconds, -1 if not set
    */
- /* public long getTimestamp() {
+  public long getTimestamp() {
     return timestamp;
-  }*/
+  }
 
   public void setTimestamp(long timestamp) {
     this.timestamp = timestamp;

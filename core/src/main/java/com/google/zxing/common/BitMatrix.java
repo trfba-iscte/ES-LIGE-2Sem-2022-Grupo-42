@@ -534,4 +534,8 @@ public boolean isValid(ResultPoint p) {
 	return p.getX() >= 0 && p.getX() <= getWidth() - 1 && p.getY() > 0 && p.getY() <= getHeight() - 1;
 }
 
+public boolean isValidRefactorEnvy(int x, int y) {
+    return x >= 0 && x < getWidth() && y >= 0 && y < getHeight();
+}
+
 }
