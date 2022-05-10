@@ -194,9 +194,7 @@ public final class RSS14Reader extends AbstractRSSReader {
       recordPattern(row, pattern.getStartEnd()[1], counters);
       // reverse it
       for (int i = 0, j = counters.length - 1; i < j; i++, j--) {
-        int temp = counters[i];
-        counters[i] = counters[j];
-        counters[j] = temp;
+        counters = RSS14Reader1(counters, i, j);
       }
     }
 
@@ -211,19 +209,9 @@ public final class RSS14Reader extends AbstractRSSReader {
     for (int i = 0; i < counters.length; i++) {
       float value = counters[i] / elementWidth;
       int count = (int) (value + 0.5f); // Round
-      if (count < 1) {
-        count = 1;
-      } else if (count > 8) {
-        count = 8;
-      }
+      count = RSS14Reader2(count);
       int offset = i / 2;
-      if ((i & 0x01) == 0) {
-        oddCounts[offset] = count;
-        oddRoundingErrors[offset] = value - count;
-      } else {
-        evenCounts[offset] = count;
-        evenRoundingErrors[offset] = value - count;
-      }
+      RSS14Reader3(oddCounts, evenCounts, oddRoundingErrors, evenRoundingErrors, i, value, count, offset);
     }
 
     adjustOddEvenCounts(outsideChar, numModules);
@@ -244,7 +232,13 @@ public final class RSS14Reader extends AbstractRSSReader {
     }
     int checksumPortion = oddChecksumPortion + 3 * evenChecksumPortion;
 
-    if (outsideChar) {
+    return RSS14Reader4(outsideChar, oddCounts, evenCounts, oddSum, evenSum, checksumPortion);
+
+  }
+
+private DataCharacter RSS14Reader4(boolean outsideChar, int[] oddCounts, int[] evenCounts, int oddSum, int evenSum,
+		int checksumPortion) throws NotFoundException {
+	if (outsideChar) {
       if ((oddSum & 0x01) != 0 || oddSum > 12 || oddSum < 4) {
         throw NotFoundException.getNotFoundInstance();
       }
@@ -269,8 +263,34 @@ public final class RSS14Reader extends AbstractRSSReader {
       int gSum = INSIDE_GSUM[group];
       return new DataCharacter(vEven * tOdd + vOdd + gSum, checksumPortion);
     }
+}
 
-  }
+private void RSS14Reader3(int[] oddCounts, int[] evenCounts, float[] oddRoundingErrors, float[] evenRoundingErrors,
+		int i, float value, int count, int offset) {
+	if ((i & 0x01) == 0) {
+        oddCounts[offset] = count;
+        oddRoundingErrors[offset] = value - count;
+      } else {
+        evenCounts[offset] = count;
+        evenRoundingErrors[offset] = value - count;
+      }
+}
+
+private int RSS14Reader2(int count) {
+	if (count < 1) {
+        count = 1;
+      } else if (count > 8) {
+        count = 8;
+      }
+	return count;
+}
+
+private int[] RSS14Reader1(int[] counters, int i, int j) {
+	int temp = counters[i];
+	counters[i] = counters[j];
+	counters[j] = temp;
+	return counters;
+}
 
   private int[] findFinderPattern(BitArray row, boolean rightFinderPattern)
       throws NotFoundException {

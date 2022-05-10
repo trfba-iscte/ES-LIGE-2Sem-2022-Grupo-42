@@ -445,12 +445,7 @@ public final class Code128Writer extends OneDimensionalCodeWriter {
             default:
               patternIndex = contents.charAt(i) - ' ';
           }
-          if ((charset == Charset.A && latch != Latch.SHIFT) ||
-              (charset == Charset.B && latch == Latch.SHIFT)) {
-            if (patternIndex < 0) {
-              patternIndex += '`';
-            }
-          }
+          patternIndex = Code128WriterMinimalEncoder4(charset, latch, patternIndex);
           addPattern(patterns, patternIndex, checkSum, checkWeight, i);
         }
       }
@@ -458,6 +453,16 @@ public final class Code128Writer extends OneDimensionalCodeWriter {
       minPath = null;
       return produceResult(patterns, checkSum[0]);
     }
+
+	private int Code128WriterMinimalEncoder4(Charset charset, Latch latch, int patternIndex) {
+		if ((charset == Charset.A && latch != Latch.SHIFT) ||
+              (charset == Charset.B && latch == Latch.SHIFT)) {
+            if (patternIndex < 0) {
+              patternIndex += '`';
+            }
+          }
+		return patternIndex;
+	}
 
     private static void addPattern(Collection<int[]> patterns,
                                   int patternIndex,
@@ -542,26 +547,48 @@ public final class Code128Writer extends OneDimensionalCodeWriter {
       }
       if (canEncode(contents, Charset.C, position)) {
         int cost = 1;
-        Latch latch = Latch.NONE;
-        if (charset != Charset.C) {
-          cost++;
-          latch = Latch.C;
-        }
-        int advance = contents.charAt(position) == ESCAPE_FNC_1 ? 1 : 2;
-        if (position + advance < contents.length()) {
-          cost += encode(contents, Charset.C, position + advance);
-        }
+        Code128Writer.MinimalEncoder.Latch latch = Code128WriterMinimalEncoder1(charset);
+		cost = Code128WriterMinimalEncoder5(charset, cost);
+        cost = Code128WriterMinimalEncoder3(contents, position, cost);
         if (cost < minCost) {
           minCost = cost;
           minLatch = latch;
         }
       }
-      if (minCost == Integer.MAX_VALUE) {
-        throw new IllegalArgumentException("Bad character in input: ASCII value=" + (int) contents.charAt(position));
-      }
+      Code128WriterMinimalEncoder6(contents, position, minCost);
       memoizedCost[charset.ordinal()][position] = minCost;
       minPath[charset.ordinal()][position] = minLatch;
       return minCost;
     }
+
+	private void Code128WriterMinimalEncoder6(CharSequence contents, int position, int minCost) {
+		if (minCost == Integer.MAX_VALUE) {
+		    throw new IllegalArgumentException("Bad character in input: ASCII value=" + (int) contents.charAt(position));
+		  }
+	}
+
+	private int Code128WriterMinimalEncoder5(Charset charset, int cost) {
+		if (charset != Charset.C) {
+          cost++;
+        }
+		return cost;
+	}
+
+	private int Code128WriterMinimalEncoder3(CharSequence contents, int position, int cost) {
+		int advance = contents.charAt(position) == ESCAPE_FNC_1 ? 1 : 2;
+		if (position + advance < contents.length()) {
+	          cost += encode(contents, Charset.C, position + advance);
+	        }
+		return cost;
+	}
+
+	private Code128Writer.MinimalEncoder.Latch Code128WriterMinimalEncoder1(
+			Code128Writer.MinimalEncoder.Charset charset) {
+		Latch latch = Latch.NONE;
+		if (charset != Charset.C) {
+			latch = Latch.C;
+		}
+		return latch;
+	}
   }
 }

@@ -347,16 +347,7 @@ public final class Code128Reader extends OneDReader {
                 } else if (result.length() == 1) {
                   symbologyModifier = 2;
                 }
-                if (convertFNC1) {
-                  if (result.length() == 0) {
-                    // GS1 specification 5.4.3.7. and 5.4.6.4. If the first char after the start code
-                    // is FNC1 then this is GS1-128. We add the symbology identifier.
-                    result.append("]C1");
-                  } else {
-                    // GS1 specification 5.4.7.5. Every subsequent FNC1 is returned as ASCII 29 (GS)
-                    result.append((char) 29);
-                  }
-                }
+                Code128Reader2(convertFNC1, result);
                 break;
               case CODE_FNC_2:
                 symbologyModifier = 4;
@@ -410,16 +401,7 @@ public final class Code128Reader extends OneDReader {
                 } else if (result.length() == 1) {
                   symbologyModifier = 2;
                 }
-                if (convertFNC1) {
-                  if (result.length() == 0) {
-                    // GS1 specification 5.4.3.7. and 5.4.6.4. If the first char after the start code
-                    // is FNC1 then this is GS1-128. We add the symbology identifier.
-                    result.append("]C1");
-                  } else {
-                    // GS1 specification 5.4.7.5. Every subsequent FNC1 is returned as ASCII 29 (GS)
-                    result.append((char) 29);
-                  }
-                }
+                Code128Reader2(convertFNC1, result);
                 break;
               case CODE_FNC_2:
                 symbologyModifier = 4;
@@ -471,16 +453,7 @@ public final class Code128Reader extends OneDReader {
                 } else if (result.length() == 1) {
                   symbologyModifier = 2;
                 }
-                if (convertFNC1) {
-                  if (result.length() == 0) {
-                    // GS1 specification 5.4.3.7. and 5.4.6.4. If the first char after the start code
-                    // is FNC1 then this is GS1-128. We add the symbology identifier.
-                    result.append("]C1");
-                  } else {
-                    // GS1 specification 5.4.7.5. Every subsequent FNC1 is returned as ASCII 29 (GS)
-                    result.append((char) 29);
-                  }
-                }
+                Code128Reader2(convertFNC1, result);
                 break;
               case CODE_CODE_A:
                 codeSet = CODE_CODE_A;
@@ -542,12 +515,8 @@ public final class Code128Reader extends OneDReader {
     float left = (startPatternInfo[1] + startPatternInfo[0]) / 2.0f;
     float right = lastStart + lastPatternSize / 2.0f;
 
-    int rawCodesSize = rawCodes.size();
-    byte[] rawBytes = new byte[rawCodesSize];
-    for (int i = 0; i < rawCodesSize; i++) {
-      rawBytes[i] = rawCodes.get(i);
-    }
-    Result resultObject = new Result(
+    byte[] rawBytes = Code128Reader1(rawCodes);
+	Result resultObject = new Result(
         result.toString(),
         rawBytes,
         new ResultPoint[]{
@@ -558,5 +527,27 @@ public final class Code128Reader extends OneDReader {
     return resultObject;
 
   }
+
+private void Code128Reader2(boolean convertFNC1, StringBuilder result) {
+	if (convertFNC1) {
+	  if (result.length() == 0) {
+	    // GS1 specification 5.4.3.7. and 5.4.6.4. If the first char after the start code
+	    // is FNC1 then this is GS1-128. We add the symbology identifier.
+	    result.append("]C1");
+	  } else {
+	    // GS1 specification 5.4.7.5. Every subsequent FNC1 is returned as ASCII 29 (GS)
+	    result.append((char) 29);
+	  }
+	}
+}
+
+private byte[] Code128Reader1(List<Byte> rawCodes) {
+	int rawCodesSize = rawCodes.size();
+	byte[] rawBytes = new byte[rawCodesSize];
+	for (int i = 0; i < rawCodesSize; i++) {
+		rawBytes[i] = rawCodes.get(i);
+	}
+	return rawBytes;
+}
 
 }

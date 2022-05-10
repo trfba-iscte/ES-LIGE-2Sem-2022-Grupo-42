@@ -155,57 +155,37 @@ public abstract class UPCEANReader extends OneDReader {
         (ResultPointCallback) hints.get(DecodeHintType.NEED_RESULT_POINT_CALLBACK);
     int symbologyIdentifier = 0;
 
-    if (resultPointCallback != null) {
-      resultPointCallback.foundPossibleResultPoint(new ResultPoint(
-          (startGuardRange[0] + startGuardRange[1]) / 2.0f, rowNumber
-      ));
-    }
+    UPCEANReader4(rowNumber, startGuardRange, resultPointCallback);
 
     StringBuilder result = decodeRowStringBuffer;
     result.setLength(0);
     int endStart = decodeMiddle(row, startGuardRange, result);
 
     if (resultPointCallback != null) {
-      resultPointCallback.foundPossibleResultPoint(new ResultPoint(
-          endStart, rowNumber
-      ));
-    }
-
+        resultPointCallback.foundPossibleResultPoint(new ResultPoint(
+            endStart, rowNumber
+        ));
+      }
     int[] endRange = decodeEnd(row, endStart);
 
-    if (resultPointCallback != null) {
-      resultPointCallback.foundPossibleResultPoint(new ResultPoint(
-          (endRange[0] + endRange[1]) / 2.0f, rowNumber
-      ));
-    }
+    UPCEANReader4(rowNumber, endRange, resultPointCallback);
 
 
     // Make sure there is a quiet zone at least as big as the end pattern after the barcode. The
     // spec might want more whitespace, but in practice this is the maximum we can count on.
     int end = endRange[1];
     int quietEnd = end + (end - endRange[0]);
-    if (quietEnd >= row.getSize() || !row.isRange(end, quietEnd, false)) {
-      throw NotFoundException.getNotFoundInstance();
-    }
+    row.UPCEANReader6(end, quietEnd);
 
     String resultString = result.toString();
     // UPC/EAN should never be less than 8 chars anyway
-    if (resultString.length() < 8) {
-      throw FormatException.getFormatInstance();
-    }
-    if (!checkChecksum(resultString)) {
-      throw ChecksumException.getChecksumInstance();
-    }
+    UPCEANReader5(resultString);
 
     float left = (startGuardRange[1] + startGuardRange[0]) / 2.0f;
     float right = (endRange[1] + endRange[0]) / 2.0f;
-    BarcodeFormat format = getBarcodeFormat();
-    Result decodeResult = new Result(resultString,
-        null, // no natural byte representation for these barcodes
-        new ResultPoint[]{
-            new ResultPoint(left, rowNumber),
-            new ResultPoint(right, rowNumber)},
-        format);
+    symbologyIdentifier = UPCEANReader3(symbologyIdentifier);
+	BarcodeFormat format = getBarcodeFormat();
+    Result decodeResult = UPCEANReader8(rowNumber, resultString, left, right, format);
 
     int extensionLength = 0;
 
@@ -221,18 +201,7 @@ public abstract class UPCEANReader extends OneDReader {
 
     int[] allowedExtensions =
         hints == null ? null : (int[]) hints.get(DecodeHintType.ALLOWED_EAN_EXTENSIONS);
-    if (allowedExtensions != null) {
-      boolean valid = false;
-      for (int length : allowedExtensions) {
-        if (extensionLength == length) {
-          valid = true;
-          break;
-        }
-      }
-      if (!valid) {
-        throw NotFoundException.getNotFoundInstance();
-      }
-    }
+    UPCEANReader8(extensionLength, allowedExtensions);
 
     if (format == BarcodeFormat.EAN_13 || format == BarcodeFormat.UPC_A) {
       String countryID = eanManSupport.lookupCountryIdentifier(resultString);
@@ -240,14 +209,62 @@ public abstract class UPCEANReader extends OneDReader {
         decodeResult.putMetadata(ResultMetadataType.POSSIBLE_COUNTRY, countryID);
       }
     }
-    if (format == BarcodeFormat.EAN_8) {
-      symbologyIdentifier = 4;
-    }
-
     decodeResult.putMetadata(ResultMetadataType.SYMBOLOGY_IDENTIFIER, "]E" + symbologyIdentifier);
 
     return decodeResult;
   }
+
+private void UPCEANReader8(int extensionLength, int[] allowedExtensions) throws NotFoundException {
+	if (allowedExtensions != null) {
+      boolean valid = false;
+      for (int length : allowedExtensions) {
+    	  if (extensionLength == length) {
+    			valid = true;
+    		}
+    	  if (extensionLength == length) {
+          break;
+        }
+      }
+      if (!valid) {
+        throw NotFoundException.getNotFoundInstance();
+      }
+    }
+}
+
+private Result UPCEANReader8(int rowNumber, String resultString, float left, float right, BarcodeFormat format) {
+	Result decodeResult = new Result(resultString,
+        null, // no natural byte representation for these barcodes
+        new ResultPoint[]{
+            new ResultPoint(left, rowNumber),
+            new ResultPoint(right, rowNumber)},
+        format);
+	return decodeResult;
+}
+
+private void UPCEANReader5(String resultString) throws FormatException, ChecksumException {
+	if (resultString.length() < 8) {
+      throw FormatException.getFormatInstance();
+    }
+    if (!checkChecksum(resultString)) {
+      throw ChecksumException.getChecksumInstance();
+    }
+}
+
+private void UPCEANReader4(int rowNumber, int[] startGuardRange, ResultPointCallback resultPointCallback) {
+	if (resultPointCallback != null) {
+      resultPointCallback.foundPossibleResultPoint(new ResultPoint(
+          (startGuardRange[0] + startGuardRange[1]) / 2.0f, rowNumber
+      ));
+    }
+}
+
+private int UPCEANReader3(int symbologyIdentifier) {
+	BarcodeFormat format = getBarcodeFormat();
+	if (format == BarcodeFormat.EAN_8) {
+		symbologyIdentifier = 4;
+	}
+	return symbologyIdentifier;
+}
 
   /**
    * @param s string of digits to check
