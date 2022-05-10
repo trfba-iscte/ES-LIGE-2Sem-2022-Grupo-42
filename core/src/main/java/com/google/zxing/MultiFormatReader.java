@@ -102,7 +102,28 @@ public final class MultiFormatReader implements Reader {
     Collection<BarcodeFormat> formats =
         hints == null ? null : (Collection<BarcodeFormat>) hints.get(DecodeHintType.POSSIBLE_FORMATS);
     Collection<Reader> readers = new ArrayList<>();
-    if (formats != null) {
+    setHitsRefactoring(hints, tryHarder, formats, readers);
+    if (readers.isEmpty()) {
+      if (!tryHarder) {
+        readers.add(new MultiFormatOneDReader(hints));
+      }
+
+      readers.add(new QRCodeReader());
+      readers.add(new DataMatrixReader());
+      readers.add(new AztecReader());
+      readers.add(new PDF417Reader());
+      readers.add(new MaxiCodeReader());
+
+      if (tryHarder) {
+        readers.add(new MultiFormatOneDReader(hints));
+      }
+    }
+    this.readers = readers.toArray(EMPTY_READER_ARRAY);
+  }
+
+private void setHitsRefactoring(Map<DecodeHintType, ?> hints, boolean tryHarder, Collection<BarcodeFormat> formats,
+		Collection<Reader> readers) {
+	if (formats != null) {
       boolean addOneDReader =
           formats.contains(BarcodeFormat.UPC_A) ||
           formats.contains(BarcodeFormat.UPC_E) ||
@@ -115,7 +136,13 @@ public final class MultiFormatReader implements Reader {
           formats.contains(BarcodeFormat.ITF) ||
           formats.contains(BarcodeFormat.RSS_14) ||
           formats.contains(BarcodeFormat.RSS_EXPANDED);
-      // Put 1D readers upfront in "normal" mode
+      Refactor2(hints, tryHarder, formats, readers, addOneDReader);
+    }
+}
+
+private void Refactor2(Map<DecodeHintType, ?> hints, boolean tryHarder, Collection<BarcodeFormat> formats,
+		Collection<Reader> readers, boolean addOneDReader) {
+	// Put 1D readers upfront in "normal" mode
       if (addOneDReader && !tryHarder) {
         readers.add(new MultiFormatOneDReader(hints));
       }
@@ -138,24 +165,7 @@ public final class MultiFormatReader implements Reader {
       if (addOneDReader && tryHarder) {
         readers.add(new MultiFormatOneDReader(hints));
       }
-    }
-    if (readers.isEmpty()) {
-      if (!tryHarder) {
-        readers.add(new MultiFormatOneDReader(hints));
-      }
-
-      readers.add(new QRCodeReader());
-      readers.add(new DataMatrixReader());
-      readers.add(new AztecReader());
-      readers.add(new PDF417Reader());
-      readers.add(new MaxiCodeReader());
-
-      if (tryHarder) {
-        readers.add(new MultiFormatOneDReader(hints));
-      }
-    }
-    this.readers = readers.toArray(EMPTY_READER_ARRAY);
-  }
+}
 
   @Override
   public void reset() {

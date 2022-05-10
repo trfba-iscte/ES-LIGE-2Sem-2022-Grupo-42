@@ -1,7 +1,13 @@
 eclipse.preferences.version=1
-encoding//src/main/java=UTF-8
+encoding//src/main/java=UTF-
 encoding//src/main/java/com/google/zxing/datamatrix/encoder/SymbolInfoProductRefactoring.java=UTF-8
 encoding//src/main/java/com/google/zxing/datamatrix/encoder/SymbolInfoProductRefactoring2.java=UTF-8
+encoding//src/main/java/com/google/zxing/oned/rss/expanded/RSSExpandedReaderProduct.java=UTF-8
+encoding//src/main/java/com/google/zxing/common/detector/MonochromeRectangleDetectorProduct.java=UTF-8
+encoding//src/main/java/com/google/zxing/common/detector/WhiteRectangleDetectorProduct.java=UTF-8
+encoding//src/main/java/com/google/zxing/common/detector/WhiteRectangleDetectorProduct2.java=UTF-8
+encoding//src/main/java/com/google/zxing/common/detector/WhiteRectangleDetectorProduct3.java=UTF-8
+encoding//src/main/java/com/google/zxing/common/reedsolomon/GenericGFProduct.java=UTF-8
 encoding//src/test/java=UTF-8
 encoding//src/test/resources=UTF-8
 encoding/<project>=UTF-8

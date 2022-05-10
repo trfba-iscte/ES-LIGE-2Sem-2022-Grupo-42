@@ -83,30 +83,24 @@ public final class BitMatrix implements Cloneable {
     int height = image.length;
     int width = image[0].length;
     BitMatrix bits = new BitMatrix(width, height);
-    for (int i = 0; i < height; i++) {
-      boolean[] imageI = image[i];
-      for (int j = 0; j < width; j++) {
-        if (imageI[j]) {
-          bits.set(j, i);
-        }
-      }
-    }
+    BitMatrixProduct.parseRefactor(image, height, width, bits);
     return bits;
   }
 
-  public static BitMatrix parse(String stringRepresentation, String setString, String unsetString) {
+public static BitMatrix parse(String stringRepresentation, String setString, String unsetString) {
     if (stringRepresentation == null) {
       throw new IllegalArgumentException();
     }
 
-    boolean[] bits = new boolean[stringRepresentation.length()];
-    int bitsPos = 0;
+    boolean[] bits = BitMatrixProduct.bits(stringRepresentation, setString, unsetString);
+	int nRows = BitMatrixProduct.nRows(stringRepresentation, setString, unsetString);
+	int bitsPos = 0;
     int rowStartPos = 0;
     int rowLength = -1;
-    int nRows = 0;
     int pos = 0;
     while (pos < stringRepresentation.length()) {
-      if (stringRepresentation.charAt(pos) == '\n' ||
+      bitsPos = BitMatrixProduct.bitsPos(stringRepresentation, setString, unsetString, bitsPos, rowStartPos, rowLength, pos);
+	if (stringRepresentation.charAt(pos) == '\n' ||
           stringRepresentation.charAt(pos) == '\r') {
         if (bitsPos > rowStartPos) {
           if (rowLength == -1) {
@@ -115,17 +109,12 @@ public final class BitMatrix implements Cloneable {
             throw new IllegalArgumentException("row lengths do not match");
           }
           rowStartPos = bitsPos;
-          nRows++;
         }
         pos++;
       }  else if (stringRepresentation.startsWith(setString, pos)) {
         pos += setString.length();
-        bits[bitsPos] = true;
-        bitsPos++;
       } else if (stringRepresentation.startsWith(unsetString, pos)) {
         pos += unsetString.length();
-        bits[bitsPos] = false;
-        bitsPos++;
       } else {
         throw new IllegalArgumentException(
             "illegal character encountered: " + stringRepresentation.substring(pos));
@@ -133,25 +122,14 @@ public final class BitMatrix implements Cloneable {
     }
 
     // no EOL at end?
-    if (bitsPos > rowStartPos) {
-      if (rowLength == -1) {
-        rowLength = bitsPos - rowStartPos;
-      } else if (bitsPos - rowStartPos != rowLength) {
-        throw new IllegalArgumentException("row lengths do not match");
-      }
-      nRows++;
-    }
+    rowLength = BitMatrixProduct.parseRefactor2(bitsPos, rowStartPos, rowLength);
 
     BitMatrix matrix = new BitMatrix(rowLength, nRows);
-    for (int i = 0; i < bitsPos; i++) {
-      if (bits[i]) {
-        matrix.set(i % rowLength, i / rowLength);
-      }
-    }
+    BitMatrixProduct.parseRefactor3(bits, bitsPos, rowLength, matrix);
     return matrix;
   }
 
-  /**
+/**
    * <p>Gets the requested bit, where true means black.</p>
    *
    * @param x The horizontal component (i.e. which column)
@@ -335,30 +313,14 @@ public final class BitMatrix implements Cloneable {
    * @return {@code left,top,width,height} enclosing rectangle of all 1 bits, or null if it is all white
    */
   public int[] getEnclosingRectangle() {
-    int left = width;
-    int top = height;
-    int right = -1;
-    int bottom = -1;
-
-    for (int y = 0; y < height; y++) {
+    int left = left();
+	int top = top();
+	int right = -1;
+    int bottom = bottom();
+	for (int y = 0; y < height; y++) {
       for (int x32 = 0; x32 < rowSize; x32++) {
         int theBits = bits[y * rowSize + x32];
         if (theBits != 0) {
-          if (y < top) {
-            top = y;
-          }
-          if (y > bottom) {
-            bottom = y;
-          }
-          if (x32 * 32 < left) {
-            int bit = 0;
-            while ((theBits << (31 - bit)) == 0) {
-              bit++;
-            }
-            if ((x32 * 32 + bit) < left) {
-              left = x32 * 32 + bit;
-            }
-          }
           if (x32 * 32 + 31 > right) {
             int bit = 31;
             while ((theBits >>> bit) == 0) {
@@ -378,6 +340,62 @@ public final class BitMatrix implements Cloneable {
 
     return new int[] {left, top, right - left + 1, bottom - top + 1};
   }
+
+private int left() {
+	int left = width;
+	for (int y = 0; y < height; y++) {
+		for (int x32 = 0; x32 < rowSize; x32++) {
+			int theBits = bits[y * rowSize + x32];
+			if (theBits != 0) {
+				if (x32 * 32 < left) {
+					int bit = bit(theBits);
+					if ((x32 * 32 + bit) < left) {
+						left = x32 * 32 + bit;
+					}
+				}
+			}
+		}
+	}
+	return left;
+}
+
+private int bottom() {
+	int bottom = -1;
+	for (int y = 0; y < height; y++) {
+		for (int x32 = 0; x32 < rowSize; x32++) {
+			int theBits = bits[y * rowSize + x32];
+			if (theBits != 0) {
+				if (y > bottom) {
+					bottom = y;
+				}
+			}
+		}
+	}
+	return bottom;
+}
+
+private int top() {
+	int top = height;
+	for (int y = 0; y < height; y++) {
+		for (int x32 = 0; x32 < rowSize; x32++) {
+			int theBits = bits[y * rowSize + x32];
+			if (theBits != 0) {
+				if (y < top) {
+					top = y;
+				}
+			}
+		}
+	}
+	return top;
+}
+
+private int bit(int theBits) {
+	int bit = 0;
+	while ((theBits << (31 - bit)) == 0) {
+		bit++;
+	}
+	return bit;
+}
 
   /**
    * This is useful in detecting a corner of a 'pure' barcode.

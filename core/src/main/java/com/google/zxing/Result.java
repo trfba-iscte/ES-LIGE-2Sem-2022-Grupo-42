@@ -150,4 +150,20 @@ public final class Result {
     return text;
   }
 
+public ResultPoint[] OneDReader1(int width) {
+	putMetadata(ResultMetadataType.ORIENTATION, 180);
+	ResultPoint[] points = getResultPoints();
+	if (points != null) {
+		points[0] = new ResultPoint(width - points[0].getX() - 1, points[0].getY());
+		points[1] = new ResultPoint(width - points[1].getX() - 1, points[1].getY());
+	}
+	return points;
+}
+
+public void OneDReader3(int width, int attempt) {
+	if (attempt == 1) {
+		ResultPoint[] points = OneDReader1(width);
+	}
+}
+
 }

@@ -16,7 +16,12 @@
 
 package com.google.zxing.common;
 
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.oned.Code93Reader;
 import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * <p>A simple, fast array of bits, represented compactly by an array of ints internally.</p>
@@ -355,5 +360,109 @@ public final class BitArray implements Cloneable {
   public BitArray clone() {
     return new BitArray(bits.clone(), size);
   }
+
+
+public int[] findAsteriskPattern(int[] counters) throws NotFoundException {
+	int width = getSize();
+	int rowOffset = getNextSet(0);
+	Arrays.fill(counters, 0);
+	int[] theCounters = counters;
+	int patternStart = rowOffset;
+	boolean isWhite = false;
+	int patternLength = theCounters.length;
+	int counterPosition = 0;
+	for (int i = rowOffset; i < width; i++) {
+		if (get(i) != isWhite) {
+			theCounters[counterPosition]++;
+		} else {
+			if (counterPosition == patternLength - 1) {
+				if (Code93Reader.toPattern(theCounters) == Code93Reader.ASTERISK_ENCODING) {
+					return new int[] { patternStart, i };
+				}
+				patternStart += theCounters[0] + theCounters[1];
+				System.arraycopy(theCounters, 2, theCounters, 0, counterPosition - 1);
+				theCounters[counterPosition - 1] = 0;
+				theCounters[counterPosition] = 0;
+				counterPosition--;
+			} else {
+				counterPosition++;
+			}
+			theCounters[counterPosition] = 1;
+			isWhite = !isWhite;
+		}
+	}
+	throw NotFoundException.getNotFoundInstance();
+}
+
+public Map<DecodeHintType, ?> OneDReader2(Map<DecodeHintType, ?> hints, int attempt) {
+	if (attempt == 1) {
+		reverse();
+		if (hints != null && hints.containsKey(DecodeHintType.NEED_RESULT_POINT_CALLBACK)) {
+			Map<DecodeHintType, Object> newHints = new EnumMap<>(DecodeHintType.class);
+			newHints.putAll(hints);
+			newHints.remove(DecodeHintType.NEED_RESULT_POINT_CALLBACK);
+			hints = newHints;
+		}
+	}
+	return hints;
+}
+
+public void UPCEANReader6(int end, int quietEnd) throws NotFoundException {
+	if (quietEnd >= getSize() || !isRange(end, quietEnd, false)) {
+		throw NotFoundException.getNotFoundInstance();
+	}
+
+public boolean isStillNumeric(int pos) {
+	if (pos + 7 > getSize()) {
+		return pos + 4 <= getSize();
+	}
+	for (int i = pos; i < pos + 3; ++i) {
+		if (get(i)) {
+			return true;
+		}
+	}
+	return get(pos + 3);
+}
+
+public boolean isAlphaTo646ToAlphaLatch(int pos) {
+	if (pos + 1 > getSize()) {
+		return false;
+	}
+	for (int i = 0; i < 5 && i + pos < getSize(); ++i) {
+		if (i == 2) {
+			if (!get(pos + 2)) {
+				return false;
+			}
+		} else if (get(pos + i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+public boolean isAlphaOr646ToNumericLatch(int pos) {
+	if (pos + 3 > getSize()) {
+		return false;
+	}
+	for (int i = pos; i < pos + 3; ++i) {
+		if (get(i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+public boolean isNumericToAlphaNumericLatch(int pos) {
+	if (pos + 1 > getSize()) {
+		return false;
+	}
+	for (int i = 0; i < 4 && i + pos < getSize(); ++i) {
+		if (get(pos + i)) {
+			return false;
+		}
+	}
+	return true;
+
+}
 
 }

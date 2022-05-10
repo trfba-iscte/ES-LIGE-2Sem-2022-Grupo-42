@@ -80,7 +80,7 @@ public final class Decoder {
   public DecoderResult decode(AztecDetectorResult detectorResult) throws FormatException {
     ddata = detectorResult;
     BitMatrix matrix = detectorResult.getBits();
-    boolean[] rawbits = extractBits(matrix);
+    boolean[] rawbits = ddata.extractBitsRefactorEnvy(matrix);
     CorrectedBitsResult correctedBits = correctBits(rawbits);
     byte[] rawBytes = convertBoolArrayToByteArray(correctedBits.correctBits);
     String result = getEncodedData(correctedBits.correctBits);
@@ -129,15 +129,7 @@ public final class Decoder {
           length = readCode(correctedBits, index, 11) + 31;
           index += 11;
         }
-        for (int charCount = 0; charCount < length; charCount++) {
-          if (endIndex - index < 8) {
-            index = endIndex;  // Force outer loop to exit
-            break;
-          }
-          int code = readCode(correctedBits, index, 8);
-          decodedBytes.write((byte) code);
-          index += 8;
-        }
+        index = getEncodedDataRefactor4(correctedBits, endIndex, decodedBytes, index, length);
         // Go back to whatever mode we had been in
         shiftTable = latchTable;
       } else {
@@ -154,12 +146,7 @@ public final class Decoder {
           }
           int n = readCode(correctedBits, index, 3);
           index += 3;
-          //  flush bytes, FLG changes state
-          try {
-            result.append(decodedBytes.toString(encoding.name()));
-          } catch (UnsupportedEncodingException uee) {
-            throw new IllegalStateException(uee);
-          }
+          getEncodedDataRefactor(result, decodedBytes, encoding);
           decodedBytes.reset();
           switch (n) {
             case 0:
@@ -177,14 +164,14 @@ public final class Decoder {
                 int nextDigit = readCode(correctedBits, index, 4);
                 index += 4;
                 if (nextDigit < 2 || nextDigit > 11) {
-                  throw FormatException.getFormatInstance(); // Not a decimal digit
-                }
+              	  throw FormatException.getFormatInstance(); // Not a decimal digit
+              	}
                 eci = eci * 10 + (nextDigit - 2);
               }
               CharacterSetECI charsetECI = CharacterSetECI.getCharacterSetECIByValue(eci);
               if (charsetECI == null) {
-                throw FormatException.getFormatInstance();
-              }
+          	    throw FormatException.getFormatInstance();
+          	  }
               encoding = charsetECI.getCharset();
           }
           // Go back to whatever mode we had been in
@@ -208,14 +195,34 @@ public final class Decoder {
         }
       }
     }
-    try {
+    getEncodedDataRefactor(result, decodedBytes, encoding);
+    return result.toString();
+  }
+
+private static int getEncodedDataRefactor4(boolean[] correctedBits, int endIndex, ByteArrayOutputStream decodedBytes,
+		int index, int length) {
+	for (int charCount = 0; charCount < length; charCount++) {
+	  if (endIndex - index < 8) {
+	    index = endIndex;  // Force outer loop to exit
+	    break;
+	  }
+	  int code = readCode(correctedBits, index, 8);
+	  decodedBytes.write((byte) code);
+	  index += 8;
+	}
+	return index;
+}
+
+
+
+private static void getEncodedDataRefactor(StringBuilder result, ByteArrayOutputStream decodedBytes, Charset encoding) {
+	try {
       result.append(decodedBytes.toString(encoding.name()));
     } catch (UnsupportedEncodingException uee) {
       // can't happen
       throw new IllegalStateException(uee);
     }
-    return result.toString();
-  }
+}
 
   /**
    * gets the table corresponding to the char passed
@@ -298,9 +305,7 @@ public final class Decoder {
 
     int numDataCodewords = ddata.getNbDatablocks();
     int numCodewords = rawbits.length / codewordSize;
-    if (numCodewords < numDataCodewords) {
-      throw FormatException.getFormatInstance();
-    }
+    correctBitsRefactor3(numDataCodewords, numCodewords);
     int offset = rawbits.length % codewordSize;
 
     int[] dataWords = new int[numCodewords];
@@ -308,12 +313,7 @@ public final class Decoder {
       dataWords[i] = readCode(rawbits, offset, codewordSize);
     }
 
-    try {
-      ReedSolomonDecoder rsDecoder = new ReedSolomonDecoder(gf);
-      rsDecoder.decode(dataWords, numCodewords - numDataCodewords);
-    } catch (ReedSolomonException ex) {
-      throw FormatException.getFormatInstance(ex);
-    }
+    correctBitsRefactor2(gf, numDataCodewords, numCodewords, dataWords);
 
     // Now perform the unstuffing operation.
     // First, count how many bits are going to be thrown out as stuffing
@@ -327,7 +327,30 @@ public final class Decoder {
         stuffedBits++;
       }
     }
-    // Now, actually unpack the bits and remove the stuffing
+    boolean[] correctedBits = correctedBitsRefactor(codewordSize, numDataCodewords, dataWords, mask, stuffedBits);
+
+    return new CorrectedBitsResult(correctedBits, 100 * (numCodewords - numDataCodewords) / numCodewords);
+  }
+
+private void correctBitsRefactor3(int numDataCodewords, int numCodewords) throws FormatException {
+	if (numCodewords < numDataCodewords) {
+      throw FormatException.getFormatInstance();
+    }
+}
+
+private void correctBitsRefactor2(GenericGF gf, int numDataCodewords, int numCodewords, int[] dataWords)
+		throws FormatException {
+	try {
+      ReedSolomonDecoder rsDecoder = new ReedSolomonDecoder(gf);
+      rsDecoder.decode(dataWords, numCodewords - numDataCodewords);
+    } catch (ReedSolomonException ex) {
+      throw FormatException.getFormatInstance(ex);
+    }
+}
+
+private boolean[] correctedBitsRefactor(int codewordSize, int numDataCodewords, int[] dataWords, int mask,
+		int stuffedBits) {
+	// Now, actually unpack the bits and remove the stuffing
     boolean[] correctedBits = new boolean[numDataCodewords * codewordSize - stuffedBits];
     int index = 0;
     for (int i = 0; i < numDataCodewords; i++) {
@@ -342,64 +365,8 @@ public final class Decoder {
         }
       }
     }
-
-    return new CorrectedBitsResult(correctedBits, 100 * (numCodewords - numDataCodewords) / numCodewords);
-  }
-
-  /**
-   * Gets the array of bits from an Aztec Code matrix
-   *
-   * @return the array of bits
-   */
-  private boolean[] extractBits(BitMatrix matrix) {
-    boolean compact = ddata.isCompact();
-    int layers = ddata.getNbLayers();
-    int baseMatrixSize = (compact ? 11 : 14) + layers * 4; // not including alignment lines
-    int[] alignmentMap = new int[baseMatrixSize];
-    boolean[] rawbits = new boolean[totalBitsInLayer(layers, compact)];
-
-    if (compact) {
-      for (int i = 0; i < alignmentMap.length; i++) {
-        alignmentMap[i] = i;
-      }
-    } else {
-      int matrixSize = baseMatrixSize + 1 + 2 * ((baseMatrixSize / 2 - 1) / 15);
-      int origCenter = baseMatrixSize / 2;
-      int center = matrixSize / 2;
-      for (int i = 0; i < origCenter; i++) {
-        int newOffset = i + i / 15;
-        alignmentMap[origCenter - i - 1] = center - newOffset - 1;
-        alignmentMap[origCenter + i] = center + newOffset + 1;
-      }
-    }
-    for (int i = 0, rowOffset = 0; i < layers; i++) {
-      int rowSize = (layers - i) * 4 + (compact ? 9 : 12);
-      // The top-left most point of this layer is <low, low> (not including alignment lines)
-      int low = i * 2;
-      // The bottom-right most point of this layer is <high, high> (not including alignment lines)
-      int high = baseMatrixSize - 1 - low;
-      // We pull bits from the two 2 x rowSize columns and two rowSize x 2 rows
-      for (int j = 0; j < rowSize; j++) {
-        int columnOffset = j * 2;
-        for (int k = 0; k < 2; k++) {
-          // left column
-          rawbits[rowOffset + columnOffset + k] =
-              matrix.get(alignmentMap[low + k], alignmentMap[low + j]);
-          // bottom row
-          rawbits[rowOffset + 2 * rowSize + columnOffset + k] =
-              matrix.get(alignmentMap[low + j], alignmentMap[high - k]);
-          // right column
-          rawbits[rowOffset + 4 * rowSize + columnOffset + k] =
-              matrix.get(alignmentMap[high - k], alignmentMap[high - j]);
-          // top row
-          rawbits[rowOffset + 6 * rowSize + columnOffset + k] =
-              matrix.get(alignmentMap[high - j], alignmentMap[low + k]);
-        }
-      }
-      rowOffset += rowSize * 8;
-    }
-    return rawbits;
-  }
+	return correctedBits;
+}
 
   /**
    * Reads a code of given length and at given index in an array of bits
@@ -435,9 +402,5 @@ public final class Decoder {
       byteArr[i] = readByte(boolArr, 8 * i);
     }
     return byteArr;
-  }
-
-  private static int totalBitsInLayer(int layers, boolean compact) {
-    return ((compact ? 88 : 112) + 16 * layers) * layers;
   }
 }

@@ -109,11 +109,7 @@ public abstract class OneDReader implements Reader {
     boolean tryHarder = hints != null && hints.containsKey(DecodeHintType.TRY_HARDER);
     int rowStep = Math.max(1, height >> (tryHarder ? 8 : 5));
     int maxLines;
-    if (tryHarder) {
-      maxLines = height; // Look at the whole image, not just the center
-    } else {
-      maxLines = 15; // 15 rows spaced 1/32 apart is roughly the middle half of the image
-    }
+    maxLines = OndeDReader3(height, tryHarder);
 
     int middle = height / 2;
     for (int x = 0; x < maxLines; x++) {
@@ -137,33 +133,12 @@ public abstract class OneDReader implements Reader {
       // While we have the image data in a BitArray, it's fairly cheap to reverse it in place to
       // handle decoding upside down barcodes.
       for (int attempt = 0; attempt < 2; attempt++) {
-        if (attempt == 1) { // trying again?
-          row.reverse(); // reverse the row and continue
-          // This means we will only ever draw result points *once* in the life of this method
-          // since we want to avoid drawing the wrong points after flipping the row, and,
-          // don't want to clutter with noise from every single row scan -- just the scans
-          // that start on the center line.
-          if (hints != null && hints.containsKey(DecodeHintType.NEED_RESULT_POINT_CALLBACK)) {
-            Map<DecodeHintType,Object> newHints = new EnumMap<>(DecodeHintType.class);
-            newHints.putAll(hints);
-            newHints.remove(DecodeHintType.NEED_RESULT_POINT_CALLBACK);
-            hints = newHints;
-          }
-        }
+        hints = row.OneDReader2(hints, attempt);
         try {
           // Look for a barcode
           Result result = decodeRow(rowNumber, row, hints);
           // We found our barcode
-          if (attempt == 1) {
-            // But it was upside down, so note that
-            result.putMetadata(ResultMetadataType.ORIENTATION, 180);
-            // And remember to flip the result points horizontally.
-            ResultPoint[] points = result.getResultPoints();
-            if (points != null) {
-              points[0] = new ResultPoint(width - points[0].getX() - 1, points[0].getY());
-              points[1] = new ResultPoint(width - points[1].getX() - 1, points[1].getY());
-            }
-          }
+          result.OneDReader3(width, attempt);
           return result;
         } catch (ReaderException re) {
           // continue -- just couldn't decode this row
@@ -174,7 +149,17 @@ public abstract class OneDReader implements Reader {
     throw NotFoundException.getNotFoundInstance();
   }
 
-  /**
+private int OndeDReader3(int height, boolean tryHarder) {
+	int maxLines;
+	if (tryHarder) {
+      maxLines = height; // Look at the whole image, not just the center
+    } else {
+      maxLines = 15; // 15 rows spaced 1/32 apart is roughly the middle half of the image
+    }
+	return maxLines;
+}
+
+/**
    * Records the size of successive runs of white and black pixels in a row, starting at a given point.
    * The values are recorded in the given array, and the number of runs recorded is equal to the size
    * of the array. If the row starts on a white pixel at the given start point, then the first count

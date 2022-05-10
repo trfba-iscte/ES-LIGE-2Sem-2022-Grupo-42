@@ -145,10 +145,7 @@ final class FieldParser {
 
     DataLength twoDigitDataLength = TWO_DIGIT_DATA_LENGTH.get(rawInformation.substring(0, 2));
     if (twoDigitDataLength != null) {
-      if (twoDigitDataLength.variable) {
-        return processVariableAI(2, twoDigitDataLength.length, rawInformation);
-      }
-      return processFixedAI(2, twoDigitDataLength.length, rawInformation);
+      return parseFieldsInGeneralPurposeRefactoring2(rawInformation, twoDigitDataLength);
     }
 
     if (rawInformation.length() < 3) {
@@ -158,10 +155,7 @@ final class FieldParser {
     String firstThreeDigits = rawInformation.substring(0, 3);
     DataLength threeDigitDataLength = THREE_DIGIT_DATA_LENGTH.get(firstThreeDigits);
     if (threeDigitDataLength != null) {
-      if (threeDigitDataLength.variable) {
-        return processVariableAI(3, threeDigitDataLength.length, rawInformation);
-      }
-      return processFixedAI(3, threeDigitDataLength.length, rawInformation);
+      return parseFieldsInGeneralPurposeRefactoring(rawInformation, threeDigitDataLength);
     }
 
     if (rawInformation.length() < 4) {
@@ -170,22 +164,40 @@ final class FieldParser {
 
     DataLength threeDigitPlusDigitDataLength = THREE_DIGIT_PLUS_DIGIT_DATA_LENGTH.get(firstThreeDigits);
     if (threeDigitPlusDigitDataLength != null) {
-      if (threeDigitPlusDigitDataLength.variable) {
-        return processVariableAI(4, threeDigitPlusDigitDataLength.length, rawInformation);
-      }
-      return processFixedAI(4, threeDigitPlusDigitDataLength.length, rawInformation);
+      return parseFieldsInGeneralPurposeRefactoring3(rawInformation, threeDigitPlusDigitDataLength);
     }
 
     DataLength firstFourDigitLength = FOUR_DIGIT_DATA_LENGTH.get(rawInformation.substring(0, 4));
     if (firstFourDigitLength != null) {
-      if (firstFourDigitLength.variable) {
-        return processVariableAI(4, firstFourDigitLength.length, rawInformation);
-      }
-      return processFixedAI(4, firstFourDigitLength.length, rawInformation);
+      return parseFieldsInGeneralPurposeRefactoring3(rawInformation, firstFourDigitLength);
     }
 
     throw NotFoundException.getNotFoundInstance();
   }
+
+private static String parseFieldsInGeneralPurposeRefactoring3(String rawInformation, DataLength firstFourDigitLength)
+		throws NotFoundException {
+	if (firstFourDigitLength.variable) {
+        return processVariableAI(4, firstFourDigitLength.length, rawInformation);
+      }
+      return processFixedAI(4, firstFourDigitLength.length, rawInformation);
+}
+
+private static String parseFieldsInGeneralPurposeRefactoring2(String rawInformation, DataLength twoDigitDataLength)
+		throws NotFoundException {
+	if (twoDigitDataLength.variable) {
+        return processVariableAI(2, twoDigitDataLength.length, rawInformation);
+      }
+      return processFixedAI(2, twoDigitDataLength.length, rawInformation);
+}
+
+private static String parseFieldsInGeneralPurposeRefactoring(String rawInformation, DataLength threeDigitDataLength)
+		throws NotFoundException {
+	if (threeDigitDataLength.variable) {
+        return processVariableAI(3, threeDigitDataLength.length, rawInformation);
+      }
+      return processFixedAI(3, threeDigitDataLength.length, rawInformation);
+}
 
   private static String processFixedAI(int aiSize, int fieldSize, String rawInformation) throws NotFoundException {
     if (rawInformation.length() < aiSize) {

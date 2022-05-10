@@ -68,22 +68,6 @@ final class GeneralAppIdDecoder {
     return buff.toString();
   }
 
-  private boolean isStillNumeric(int pos) {
-    // It's numeric if it still has 7 positions
-    // and one of the first 4 bits is "1".
-    if (pos + 7 > this.information.getSize()) {
-      return pos + 4 <= this.information.getSize();
-    }
-
-    for (int i = pos; i < pos + 3; ++i) {
-      if (this.information.get(i)) {
-        return true;
-      }
-    }
-
-    return this.information.get(pos + 3);
-  }
-
   private DecodedNumeric decodeNumeric(int pos) throws FormatException {
     if (pos + 7 > this.information.getSize()) {
       int numeric = extractNumericValueFromBitArray(pos, 4);
@@ -159,7 +143,7 @@ final class GeneralAppIdDecoder {
   }
 
   private BlockParsedResult parseNumericBlock() throws FormatException {
-    while (isStillNumeric(current.getPosition())) {
+    while (information.isStillNumeric(current.getPosition())) {
       DecodedNumeric numeric = decodeNumeric(current.getPosition());
       current.setPosition(numeric.getNewPosition());
 
@@ -181,7 +165,7 @@ final class GeneralAppIdDecoder {
       buffer.append(numeric.getSecondDigit());
     }
 
-    if (isNumericToAlphaNumericLatch(current.getPosition())) {
+    if (information.isNumericToAlphaNumericLatch(current.getPosition())) {
       current.setAlpha();
       current.incrementPosition(4);
     }
@@ -200,10 +184,10 @@ final class GeneralAppIdDecoder {
       buffer.append(iso.getValue());
     }
 
-    if (isAlphaOr646ToNumericLatch(current.getPosition())) {
+    if (information.isAlphaOr646ToNumericLatch(current.getPosition())) {
       current.incrementPosition(3);
       current.setNumeric();
-    } else if (isAlphaTo646ToAlphaLatch(current.getPosition())) {
+    } else if (information.isAlphaTo646ToAlphaLatch(current.getPosition())) {
       if (current.getPosition() + 5 < this.information.getSize()) {
         current.incrementPosition(5);
       } else {
@@ -228,10 +212,10 @@ final class GeneralAppIdDecoder {
       buffer.append(alpha.getValue());
     }
 
-    if (isAlphaOr646ToNumericLatch(current.getPosition())) {
+    if (information.isAlphaOr646ToNumericLatch(current.getPosition())) {
       current.incrementPosition(3);
       current.setNumeric();
-    } else if (isAlphaTo646ToAlphaLatch(current.getPosition())) {
+    } else if (information.isAlphaTo646ToAlphaLatch(current.getPosition())) {
       if (current.getPosition() + 5 < this.information.getSize()) {
         current.incrementPosition(5);
       } else {
@@ -398,7 +382,12 @@ final class GeneralAppIdDecoder {
       return new DecodedChar(pos + 6, (char) (sixBitValue + 33));
     }
 
-    char c;
+    char c = decodeAlphanumericRefactoring(sixBitValue);
+    return new DecodedChar(pos + 6, c);
+  }
+
+private char decodeAlphanumericRefactoring(int sixBitValue) {
+	char c;
     switch (sixBitValue) {
       case 58:
         c = '*';
@@ -418,53 +407,6 @@ final class GeneralAppIdDecoder {
       default:
         throw new IllegalStateException("Decoding invalid alphanumeric value: " + sixBitValue);
     }
-    return new DecodedChar(pos + 6, c);
-  }
-
-  private boolean isAlphaTo646ToAlphaLatch(int pos) {
-    if (pos + 1 > this.information.getSize()) {
-      return false;
-    }
-
-    for (int i = 0; i < 5 && i + pos < this.information.getSize(); ++i) {
-      if (i == 2) {
-        if (!this.information.get(pos + 2)) {
-          return false;
-        }
-      } else if (this.information.get(pos + i)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  private boolean isAlphaOr646ToNumericLatch(int pos) {
-    // Next is alphanumeric if there are 3 positions and they are all zeros
-    if (pos + 3 > this.information.getSize()) {
-      return false;
-    }
-
-    for (int i = pos; i < pos + 3; ++i) {
-      if (this.information.get(i)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private boolean isNumericToAlphaNumericLatch(int pos) {
-    // Next is alphanumeric if there are 4 positions and they are all zeros, or
-    // if there is a subset of this just before the end of the symbol
-    if (pos + 1 > this.information.getSize()) {
-      return false;
-    }
-
-    for (int i = 0; i < 4 && i + pos < this.information.getSize(); ++i) {
-      if (this.information.get(pos + i)) {
-        return false;
-      }
-    }
-    return true;
-  }
+	return c;
+}
 }

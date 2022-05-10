@@ -17,6 +17,7 @@
 package com.google.zxing.datamatrix.decoder;
 
 import com.google.zxing.FormatException;
+import com.google.zxing.common.BitMatrix;
 
 /**
  * The Version object encapsulates attributes about a particular
@@ -272,5 +273,43 @@ public final class Version {
             new ECBlocks(50, new ECB(1, 118)))
     };
   }
+
+/**
+ * <p>Extracts the data region from a  {@link BitMatrix}  that contains alignment patterns.</p>
+ * @param bitMatrix  Original  {@link BitMatrix}  with alignment patterns
+ * @return  BitMatrix that has the alignment patterns removed
+ */
+public BitMatrix extractDataRegion(BitMatrix bitMatrix) {
+	int symbolSizeRows = getSymbolSizeRows();
+	int symbolSizeColumns = getSymbolSizeColumns();
+	if (bitMatrix.getHeight() != symbolSizeRows) {
+		throw new IllegalArgumentException("Dimension of bitMatrix must match the version size");
+	}
+	int dataRegionSizeRows = getDataRegionSizeRows();
+	int dataRegionSizeColumns = getDataRegionSizeColumns();
+	int numDataRegionsRow = symbolSizeRows / dataRegionSizeRows;
+	int numDataRegionsColumn = symbolSizeColumns / dataRegionSizeColumns;
+	int sizeDataRegionRow = numDataRegionsRow * dataRegionSizeRows;
+	int sizeDataRegionColumn = numDataRegionsColumn * dataRegionSizeColumns;
+	BitMatrix bitMatrixWithoutAlignment = new BitMatrix(sizeDataRegionColumn, sizeDataRegionRow);
+	for (int dataRegionRow = 0; dataRegionRow < numDataRegionsRow; ++dataRegionRow) {
+		int dataRegionRowOffset = dataRegionRow * dataRegionSizeRows;
+		for (int dataRegionColumn = 0; dataRegionColumn < numDataRegionsColumn; ++dataRegionColumn) {
+			int dataRegionColumnOffset = dataRegionColumn * dataRegionSizeColumns;
+			for (int i = 0; i < dataRegionSizeRows; ++i) {
+				int readRowOffset = dataRegionRow * (dataRegionSizeRows + 2) + 1 + i;
+				int writeRowOffset = dataRegionRowOffset + i;
+				for (int j = 0; j < dataRegionSizeColumns; ++j) {
+					int readColumnOffset = dataRegionColumn * (dataRegionSizeColumns + 2) + 1 + j;
+					if (bitMatrix.get(readColumnOffset, readRowOffset)) {
+						int writeColumnOffset = dataRegionColumnOffset + j;
+						bitMatrixWithoutAlignment.set(writeColumnOffset, writeRowOffset);
+					}
+				}
+			}
+		}
+	}
+	return bitMatrixWithoutAlignment;
+}
 
 }

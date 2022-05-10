@@ -101,54 +101,11 @@ final class DecodedBitStreamParser {
       if (mode == Mode.ASCII_ENCODE) {
         mode = decodeAsciiSegment(bits, result, resultTrailer, fnc1Positions);
       } else {
-        switch (mode) {
-          case C40_ENCODE:
-            decodeC40Segment(bits, result, fnc1Positions);
-            break;
-          case TEXT_ENCODE:
-            decodeTextSegment(bits, result, fnc1Positions);
-            break;
-          case ANSIX12_ENCODE:
-            decodeAnsiX12Segment(bits, result);
-            break;
-          case EDIFACT_ENCODE:
-            decodeEdifactSegment(bits, result);
-            break;
-          case BASE256_ENCODE:
-            decodeBase256Segment(bits, result, byteSegments);
-            break;
-          case ECI_ENCODE:
-            decodeECISegment(bits, result);
-            isECIencoded = true; // ECI detection only, atm continue decoding as ASCII
-            break;
-          default:
-            throw FormatException.getFormatInstance();
-        }
+        isECIencoded = decodeBitStreamRefactor2(bits, result, byteSegments, mode, fnc1Positions, isECIencoded);
         mode = Mode.ASCII_ENCODE;
       }
     } while (mode != Mode.PAD_ENCODE && bits.available() > 0);
-    if (resultTrailer.length() > 0) {
-      result.append(resultTrailer);
-    }
-    if (isECIencoded) {
-      // Examples for this numbers can be found in this documentation of a hardware barcode scanner:
-      // https://honeywellaidc.force.com/supportppr/s/article/List-of-barcode-symbology-AIM-Identifiers
-      if (fnc1Positions.contains(0) || fnc1Positions.contains(4)) {
-        symbologyModifier = 5;
-      } else if (fnc1Positions.contains(1) || fnc1Positions.contains(5)) {
-        symbologyModifier = 6;
-      } else {
-        symbologyModifier = 4;
-      }
-    } else {
-      if (fnc1Positions.contains(0) || fnc1Positions.contains(4)) {
-        symbologyModifier = 2;
-      } else if (fnc1Positions.contains(1) || fnc1Positions.contains(5)) {
-        symbologyModifier = 3;
-      } else {
-        symbologyModifier = 1;
-      }
-    }
+    symbologyModifier = decodeBitStreamRefactor(result, resultTrailer, fnc1Positions, isECIencoded);
 
     return new DecoderResult(bytes,
                              result.toString(),
@@ -156,6 +113,74 @@ final class DecodedBitStreamParser {
                              null,
                              symbologyModifier);
   }
+
+private static boolean decodeBitStreamRefactor2(BitSource bits, ECIStringBuilder result, List<byte[]> byteSegments,
+		Mode mode, Set<Integer> fnc1Positions, boolean isECIencoded) throws FormatException {
+	switch (mode) {
+	  case C40_ENCODE:
+	    decodeC40Segment(bits, result, fnc1Positions);
+	    break;
+	  case TEXT_ENCODE:
+	    decodeTextSegment(bits, result, fnc1Positions);
+	    break;
+	  case ANSIX12_ENCODE:
+	    decodeAnsiX12Segment(bits, result);
+	    break;
+	  case EDIFACT_ENCODE:
+	    decodeEdifactSegment(bits, result);
+	    break;
+	  case BASE256_ENCODE:
+	    decodeBase256Segment(bits, result, byteSegments);
+	    break;
+	  case ECI_ENCODE:
+	    decodeECISegment(bits, result);
+	    isECIencoded = true; // ECI detection only, atm continue decoding as ASCII
+	    break;
+	  default:
+	    throw FormatException.getFormatInstance();
+	}
+	return isECIencoded;
+}
+
+private static int decodeBitStreamRefactor(ECIStringBuilder result, StringBuilder resultTrailer,
+		Set<Integer> fnc1Positions, boolean isECIencoded) {
+	int symbologyModifier;
+	if (resultTrailer.length() > 0) {
+      result.append(resultTrailer);
+    }
+    if (isECIencoded) {
+      // Examples for this numbers can be found in this documentation of a hardware barcode scanner:
+      // https://honeywellaidc.force.com/supportppr/s/article/List-of-barcode-symbology-AIM-Identifiers
+      symbologyModifier = decodeBitStreamRefactor2(fnc1Positions);
+    } else {
+      symbologyModifier = decodeBitStreamRefactor3(fnc1Positions);
+    }
+	return symbologyModifier;
+}
+
+private static int decodeBitStreamRefactor3(Set<Integer> fnc1Positions) {
+	int symbologyModifier;
+	if (fnc1Positions.contains(0) || fnc1Positions.contains(4)) {
+        symbologyModifier = 2;
+      } else if (fnc1Positions.contains(1) || fnc1Positions.contains(5)) {
+        symbologyModifier = 3;
+      } else {
+        symbologyModifier = 1;
+      }
+	return symbologyModifier;
+}
+
+private static int decodeBitStreamRefactor2(Set<Integer> fnc1Positions) {
+	int symbologyModifier;
+	if (fnc1Positions.contains(0) || fnc1Positions.contains(4)) {
+        symbologyModifier = 5;
+      } else if (fnc1Positions.contains(1) || fnc1Positions.contains(5)) {
+        symbologyModifier = 6;
+      } else {
+        symbologyModifier = 4;
+      }
+	return symbologyModifier;
+}
 
   /**
    * See ISO 16022:2006, 5.2.3 and Annex C, Table C.2
