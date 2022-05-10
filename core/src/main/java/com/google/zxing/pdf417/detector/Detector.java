@@ -214,7 +214,17 @@ public final class Detector {
     int stopRow = startRow + 1;
     // Last row of the current symbol that contains pattern
     if (found) {
-      int skippedRowCount = 0;
+      stopRow = findRowsWithPatternRefactoring(matrix, height, width, pattern, result, counters, stopRow);
+    }
+    if (stopRow - startRow < BARCODE_MIN_HEIGHT) {
+      Arrays.fill(result, null);
+    }
+    return result;
+  }
+
+private static int findRowsWithPatternRefactoring(BitMatrix matrix, int height, int width, int[] pattern,
+		ResultPoint[] result, int[] counters, int stopRow) {
+	int skippedRowCount = 0;
       int[] previousRowLoc = {(int) result[0].getX(), (int) result[1].getX()};
       for (; stopRow < height; stopRow++) {
         int[] loc = findGuardPattern(matrix, previousRowLoc[0], stopRow, width, pattern, counters);
@@ -238,12 +248,8 @@ public final class Detector {
       stopRow -= skippedRowCount + 1;
       result[2] = new ResultPoint(previousRowLoc[0], stopRow);
       result[3] = new ResultPoint(previousRowLoc[1], stopRow);
-    }
-    if (stopRow - startRow < BARCODE_MIN_HEIGHT) {
-      Arrays.fill(result, null);
-    }
-    return result;
-  }
+	return stopRow;
+}
 
   /**
    * @param matrix row of black/white values to search

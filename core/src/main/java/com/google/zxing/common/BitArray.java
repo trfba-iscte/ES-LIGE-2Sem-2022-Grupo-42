@@ -356,4 +356,56 @@ public final class BitArray implements Cloneable {
     return new BitArray(bits.clone(), size);
   }
 
+public boolean isStillNumeric(int pos) {
+	if (pos + 7 > getSize()) {
+		return pos + 4 <= getSize();
+	}
+	for (int i = pos; i < pos + 3; ++i) {
+		if (get(i)) {
+			return true;
+		}
+	}
+	return get(pos + 3);
+}
+
+public boolean isAlphaTo646ToAlphaLatch(int pos) {
+	if (pos + 1 > getSize()) {
+		return false;
+	}
+	for (int i = 0; i < 5 && i + pos < getSize(); ++i) {
+		if (i == 2) {
+			if (!get(pos + 2)) {
+				return false;
+			}
+		} else if (get(pos + i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+public boolean isAlphaOr646ToNumericLatch(int pos) {
+	if (pos + 3 > getSize()) {
+		return false;
+	}
+	for (int i = pos; i < pos + 3; ++i) {
+		if (get(i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+public boolean isNumericToAlphaNumericLatch(int pos) {
+	if (pos + 1 > getSize()) {
+		return false;
+	}
+	for (int i = 0; i < 4 && i + pos < getSize(); ++i) {
+		if (get(pos + i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 }

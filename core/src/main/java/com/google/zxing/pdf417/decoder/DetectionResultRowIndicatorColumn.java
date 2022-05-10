@@ -46,7 +46,7 @@ final class DetectionResultRowIndicatorColumn extends DetectionResultColumn {
   void adjustCompleteIndicatorColumnRowNumbers(BarcodeMetadata barcodeMetadata) {
     Codeword[] codewords = getCodewords();
     setRowNumbers();
-    removeIncorrectCodewords(codewords, barcodeMetadata);
+    barcodeMetadata.removeIncorrectCodewords(codewords, isLeft);
     BoundingBox boundingBox = getBoundingBox();
     ResultPoint top = isLeft ? boundingBox.getTopLeft() : boundingBox.getTopRight();
     ResultPoint bottom = isLeft ? boundingBox.getBottomLeft() : boundingBox.getBottomRight();
@@ -79,18 +79,9 @@ final class DetectionResultRowIndicatorColumn extends DetectionResultColumn {
                  rowDifference > codewordsRow) {
         codewords[codewordsRow] = null;
       } else {
-        int checkedRows;
-        if (maxRowHeight > 2) {
-          checkedRows = (maxRowHeight - 2) * rowDifference;
-        } else {
-          checkedRows = rowDifference;
-        }
-        boolean closePreviousCodewordFound = checkedRows >= codewordsRow;
-        for (int i = 1; i <= checkedRows && !closePreviousCodewordFound; i++) {
-          // there must be (height * rowDifference) number of codewords missing. For now we assume height = 1.
-          // This should hopefully get rid of most problems already.
-          closePreviousCodewordFound = codewords[codewordsRow - i] != null;
-        }
+        int checkedRows = adjustCompleteIndicatorColumnRowNumbersRefactoring(maxRowHeight, rowDifference);
+        boolean closePreviousCodewordFound = adjustCompleteIndicatorColumnRowNumbersRefactoring(codewords, codewordsRow,
+				checkedRows);
         if (closePreviousCodewordFound) {
           codewords[codewordsRow] = null;
         } else {
@@ -101,6 +92,27 @@ final class DetectionResultRowIndicatorColumn extends DetectionResultColumn {
     }
     //return (int) (averageRowHeight + 0.5);
   }
+
+private int adjustCompleteIndicatorColumnRowNumbersRefactoring(int maxRowHeight, int rowDifference) {
+	int checkedRows;
+	if (maxRowHeight > 2) {
+	  checkedRows = (maxRowHeight - 2) * rowDifference;
+	} else {
+	  checkedRows = rowDifference;
+	}
+	return checkedRows;
+}
+
+private boolean adjustCompleteIndicatorColumnRowNumbersRefactoring(Codeword[] codewords, int codewordsRow,
+		int checkedRows) {
+	boolean closePreviousCodewordFound = checkedRows >= codewordsRow;
+	for (int i = 1; i <= checkedRows && !closePreviousCodewordFound; i++) {
+	  // there must be (height * rowDifference) number of codewords missing. For now we assume height = 1.
+	  // This should hopefully get rid of most problems already.
+	  closePreviousCodewordFound = codewords[codewordsRow - i] != null;
+	}
+	return closePreviousCodewordFound;
+}
 
   int[] getRowHeights() {
     BarcodeMetadata barcodeMetadata = getBarcodeMetadata();
@@ -177,21 +189,8 @@ final class DetectionResultRowIndicatorColumn extends DetectionResultColumn {
       codeword.setRowNumberAsRowIndicatorColumn();
       int rowIndicatorValue = codeword.getValue() % 30;
       int codewordRowNumber = codeword.getRowNumber();
-      if (!isLeft) {
-        codewordRowNumber += 2;
-      }
-      switch (codewordRowNumber % 3) {
-        case 0:
-          barcodeRowCountUpperPart.setValue(rowIndicatorValue * 3 + 1);
-          break;
-        case 1:
-          barcodeECLevel.setValue(rowIndicatorValue / 3);
-          barcodeRowCountLowerPart.setValue(rowIndicatorValue % 3);
-          break;
-        case 2:
-          barcodeColumnCount.setValue(rowIndicatorValue + 1);
-          break;
-      }
+      codewordRowNumber = getBarcodeMetadataRefactoring(barcodeColumnCount, barcodeRowCountUpperPart,
+			barcodeRowCountLowerPart, barcodeECLevel, rowIndicatorValue, codewordRowNumber);
     }
     // Maybe we should check if we have ambiguous values?
     if ((barcodeColumnCount.getValue().length == 0) ||
@@ -207,47 +206,30 @@ final class DetectionResultRowIndicatorColumn extends DetectionResultColumn {
     }
     BarcodeMetadata barcodeMetadata = new BarcodeMetadata(barcodeColumnCount.getValue()[0],
         barcodeRowCountUpperPart.getValue()[0], barcodeRowCountLowerPart.getValue()[0], barcodeECLevel.getValue()[0]);
-    removeIncorrectCodewords(codewords, barcodeMetadata);
+    barcodeMetadata.removeIncorrectCodewords(codewords, isLeft);
     return barcodeMetadata;
   }
 
-  private void removeIncorrectCodewords(Codeword[] codewords, BarcodeMetadata barcodeMetadata) {
-    // Remove codewords which do not match the metadata
-    // TODO Maybe we should keep the incorrect codewords for the start and end positions?
-    for (int codewordRow = 0; codewordRow < codewords.length; codewordRow++) {
-      Codeword codeword = codewords[codewordRow];
-      if (codewords[codewordRow] == null) {
-        continue;
-      }
-      int rowIndicatorValue = codeword.getValue() % 30;
-      int codewordRowNumber = codeword.getRowNumber();
-      if (codewordRowNumber > barcodeMetadata.getRowCount()) {
-        codewords[codewordRow] = null;
-        continue;
-      }
-      if (!isLeft) {
+private int getBarcodeMetadataRefactoring(BarcodeValue barcodeColumnCount, BarcodeValue barcodeRowCountUpperPart,
+		BarcodeValue barcodeRowCountLowerPart, BarcodeValue barcodeECLevel, int rowIndicatorValue,
+		int codewordRowNumber) {
+	if (!isLeft) {
         codewordRowNumber += 2;
       }
       switch (codewordRowNumber % 3) {
         case 0:
-          if (rowIndicatorValue * 3 + 1 != barcodeMetadata.getRowCountUpperPart()) {
-            codewords[codewordRow] = null;
-          }
+          barcodeRowCountUpperPart.setValue(rowIndicatorValue * 3 + 1);
           break;
         case 1:
-          if (rowIndicatorValue / 3 != barcodeMetadata.getErrorCorrectionLevel() ||
-              rowIndicatorValue % 3 != barcodeMetadata.getRowCountLowerPart()) {
-            codewords[codewordRow] = null;
-          }
+          barcodeECLevel.setValue(rowIndicatorValue / 3);
+          barcodeRowCountLowerPart.setValue(rowIndicatorValue % 3);
           break;
         case 2:
-          if (rowIndicatorValue + 1 != barcodeMetadata.getColumnCount()) {
-            codewords[codewordRow] = null;
-          }
+          barcodeColumnCount.setValue(rowIndicatorValue + 1);
           break;
       }
-    }
-  }
+	return codewordRowNumber;
+}
 
   boolean isLeft() {
     return isLeft;
