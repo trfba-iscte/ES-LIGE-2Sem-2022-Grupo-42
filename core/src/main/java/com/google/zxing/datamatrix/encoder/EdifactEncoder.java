@@ -30,14 +30,14 @@ final class EdifactEncoder implements Encoder {
     while (context.hasMoreCharacters()) {
       char c = context.getCurrentChar();
       encodeChar(c, buffer);
-      context.data.pos++;
+      context.pos++;
 
       int count = buffer.length();
       if (count >= 4) {
         context.writeCodewords(encodeToCodewords(buffer));
         buffer.delete(0, 4);
 
-        int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.data.pos, getEncodingMode());
+        int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.pos, getEncodingMode());
         if (newMode != getEncodingMode()) {
           // Return to ASCII encodation, which will actually handle latch to new mode
           context.signalEncoderChange(HighLevelEncoder.ASCII_ENCODATION);
@@ -76,7 +76,9 @@ final class EdifactEncoder implements Encoder {
         }
       }
 
-      handleEODRefactoring(count);
+      if (count > 4) {
+        throw new IllegalStateException("Count must not exceed 4");
+      }
       int restChars = count - 1;
       String encoded = encodeToCodewords(buffer);
       boolean endOfSymbolReached = !context.hasMoreCharacters();
@@ -94,7 +96,7 @@ final class EdifactEncoder implements Encoder {
 
       if (restInAscii) {
         context.resetSymbolInfo();
-        context.data.pos -= restChars;
+        context.pos -= restChars;
       } else {
         context.writeCodewords(encoded);
       }
@@ -102,12 +104,6 @@ final class EdifactEncoder implements Encoder {
       context.signalEncoderChange(HighLevelEncoder.ASCII_ENCODATION);
     }
   }
-
-private static void handleEODRefactoring(int count) {
-	if (count > 4) {
-        throw new IllegalStateException("Count must not exceed 4");
-      }
-}
 
   private static void encodeChar(char c, StringBuilder sb) {
     if (c >= ' ' && c <= '?') {

@@ -159,7 +159,11 @@ public final class ErrorCorrection {
           ecc[k] = ecc[k - 1];
         }
       }
-      createECCBlockRefactoring(poly, ecc, m);
+      if (m != 0 && poly[0] != 0) {
+        ecc[0] = (char) ALOG[(LOG[m] + LOG[poly[0]]) % 255];
+      } else {
+        ecc[0] = 0;
+      }
     }
     char[] eccReversed = new char[numECWords];
     for (int i = 0; i < numECWords; i++) {
@@ -167,13 +171,5 @@ public final class ErrorCorrection {
     }
     return String.valueOf(eccReversed);
   }
-
-private static void createECCBlockRefactoring(int[] poly, char[] ecc, int m) {
-	if (m != 0 && poly[0] != 0) {
-        ecc[0] = (char) ALOG[(LOG[m] + LOG[poly[0]]) % 255];
-      } else {
-        ecc[0] = 0;
-      }
-}
 
 }

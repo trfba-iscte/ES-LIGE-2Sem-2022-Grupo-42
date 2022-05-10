@@ -25,9 +25,7 @@ import com.google.zxing.Dimension;
  */
 public class SymbolInfo {
 
-  private SymbolInfoProductRefactoring2 symbolInfoProductRefactoring2 = new SymbolInfoProductRefactoring2();
-
-static final SymbolInfo[] PROD_SYMBOLS = {
+  static final SymbolInfo[] PROD_SYMBOLS = {
     new SymbolInfo(false, 3, 5, 8, 8, 1),
     new SymbolInfo(false, 5, 7, 10, 10, 1),
       /*rect*/new SymbolInfo(true, 5, 7, 16, 6, 1),
@@ -70,6 +68,7 @@ static final SymbolInfo[] PROD_SYMBOLS = {
   private final int errorCodewords;
   public final int matrixWidth;
   public final int matrixHeight;
+  private final int dataRegions;
   private final int rsBlockData;
   private final int rsBlockError;
 
@@ -91,12 +90,12 @@ static final SymbolInfo[] PROD_SYMBOLS = {
   SymbolInfo(boolean rectangular, int dataCapacity, int errorCodewords,
              int matrixWidth, int matrixHeight, int dataRegions,
              int rsBlockData, int rsBlockError) {
-    symbolInfoProductRefactoring2.setSymbolInfoProductRefactoring(new SymbolInfoProductRefactoring(dataRegions));
-	this.rectangular = rectangular;
+    this.rectangular = rectangular;
     this.dataCapacity = dataCapacity;
     this.errorCodewords = errorCodewords;
     this.matrixWidth = matrixWidth;
     this.matrixHeight = matrixHeight;
+    this.dataRegions = dataRegions;
     this.rsBlockData = rsBlockData;
     this.rsBlockError = rsBlockError;
   }
@@ -125,13 +124,15 @@ static final SymbolInfo[] PROD_SYMBOLS = {
                                   Dimension maxSize,
                                   boolean fail) {
     for (SymbolInfo symbol : symbols) {
-      if (lookupRefactoring(shape, symbol)) {
+      if (shape == SymbolShapeHint.FORCE_SQUARE && symbol.rectangular) {
         continue;
       }
       if (shape == SymbolShapeHint.FORCE_RECTANGLE && !symbol.rectangular) {
         continue;
       }
-      if (lookupRefactoring2(minSize, symbol)) {
+      if (minSize != null
+          && (symbol.getSymbolWidth() < minSize.getWidth()
+          || symbol.getSymbolHeight() < minSize.getHeight())) {
         continue;
       }
       if (maxSize != null
@@ -143,46 +144,60 @@ static final SymbolInfo[] PROD_SYMBOLS = {
         return symbol;
       }
     }
-    lookupRefactoring1(dataCodewords, fail);
-    return null;
-  }
-
-private static boolean lookupRefactoring2(Dimension minSize, SymbolInfo symbol) {
-	return minSize != null
-          && (symbol.getSymbolWidth() < minSize.getWidth()
-          || symbol.getSymbolHeight() < minSize.getHeight());
-}
-
-private static boolean lookupRefactoring(SymbolShapeHint shape, SymbolInfo symbol) {
-	return shape == SymbolShapeHint.FORCE_SQUARE && symbol.rectangular;
-}
-
-private static void lookupRefactoring1(int dataCodewords, boolean fail) {
-	lookupRefactoring(dataCodewords, fail);
-}
-
-private static void lookupRefactoring(int dataCodewords, boolean fail) {
-	if (fail) {
+    if (fail) {
       throw new IllegalArgumentException(
           "Can't find a symbol arrangement that matches the message. Data codewords: "
               + dataCodewords);
     }
-}
+    return null;
+  }
+
+  private int getHorizontalDataRegions() {
+    switch (dataRegions) {
+      case 1:
+        return 1;
+      case 2:
+      case 4:
+        return 2;
+      case 16:
+        return 4;
+      case 36:
+        return 6;
+      default:
+        throw new IllegalStateException("Cannot handle this number of data regions");
+    }
+  }
+
+  private int getVerticalDataRegions() {
+    switch (dataRegions) {
+      case 1:
+      case 2:
+        return 1;
+      case 4:
+        return 2;
+      case 16:
+        return 4;
+      case 36:
+        return 6;
+      default:
+        throw new IllegalStateException("Cannot handle this number of data regions");
+    }
+  }
 
   public final int getSymbolDataWidth() {
-    return symbolInfoProductRefactoring2.getSymbolDataWidth(this.matrixWidth);
+    return getHorizontalDataRegions() * matrixWidth;
   }
 
   public final int getSymbolDataHeight() {
-    return symbolInfoProductRefactoring2.getSymbolInfoProductRefactoring().getVerticalDataRegions() * matrixHeight;
+    return getVerticalDataRegions() * matrixHeight;
   }
 
   public final int getSymbolWidth() {
-    return symbolInfoProductRefactoring2.getSymbolWidth(this.matrixWidth);
+    return getSymbolDataWidth() + (getHorizontalDataRegions() * 2);
   }
 
   public final int getSymbolHeight() {
-    return getSymbolDataHeight() + (symbolInfoProductRefactoring2.getSymbolInfoProductRefactoring().getVerticalDataRegions() * 2);
+    return getSymbolDataHeight() + (getVerticalDataRegions() * 2);
   }
 
   public int getCodewordCount() {
@@ -213,8 +228,8 @@ private static void lookupRefactoring(int dataCodewords, boolean fail) {
   public final String toString() {
     return (rectangular ? "Rectangular Symbol:" : "Square Symbol:") +
         " data region " + matrixWidth + 'x' + matrixHeight +
-        ", symbol size " + symbolInfoProductRefactoring2.getSymbolWidth(this.matrixWidth) + 'x' + getSymbolHeight() +
-        ", symbol data size " + symbolInfoProductRefactoring2.getSymbolDataWidth(this.matrixWidth) + 'x' + getSymbolDataHeight() +
+        ", symbol size " + getSymbolWidth() + 'x' + getSymbolHeight() +
+        ", symbol data size " + getSymbolDataWidth() + 'x' + getSymbolDataHeight() +
         ", codewords " + dataCapacity + '+' + errorCodewords;
   }
 

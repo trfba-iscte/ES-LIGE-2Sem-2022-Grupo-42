@@ -225,13 +225,13 @@ public final class Detector {
         pointD.getX() + (pointA.getX() - pointB.getX()) / (trRight + 1),
         pointD.getY() + (pointA.getY() - pointB.getY()) / (trRight + 1));
 
-    if (!image.isValid(candidate1)) {
-      if (image.isValid(candidate2)) {
+    if (!isValid(candidate1)) {
+      if (isValid(candidate2)) {
         return candidate2;
       }
       return null;
     }
-    if (!image.isValid(candidate2)) {
+    if (!isValid(candidate2)) {
       return candidate1;
     }
 
@@ -300,6 +300,10 @@ public final class Detector {
     return new ResultPoint[]{pointAs, pointBs, pointCs, pointDs};
   }
 
+  private boolean isValid(ResultPoint p) {
+    return p.getX() >= 0 && p.getX() <= image.getWidth() - 1 && p.getY() > 0 && p.getY() <= image.getHeight() - 1;
+  }
+
   private static BitMatrix sampleGrid(BitMatrix image,
                                       ResultPoint topLeft,
                                       ResultPoint bottomLeft,
@@ -357,7 +361,7 @@ public final class Detector {
     int ystep = fromY < toY ? 1 : -1;
     int xstep = fromX < toX ? 1 : -1;
     int transitions = 0;
-    boolean inBlack = transitionsBetweenRefactoring(fromX, fromY, steep);
+    boolean inBlack = image.get(steep ? fromY : fromX, steep ? fromX : fromY);
     for (int x = fromX, y = fromY; x != toX; x += xstep) {
       boolean isBlack = image.get(steep ? y : x, steep ? x : y);
       if (isBlack != inBlack) {
@@ -375,10 +379,5 @@ public final class Detector {
     }
     return transitions;
   }
-
-private boolean transitionsBetweenRefactoring(int fromX, int fromY, boolean steep) {
-	boolean inBlack = image.get(steep ? fromY : fromX, steep ? fromX : fromY);
-	return inBlack;
-}
 
 }

@@ -26,14 +26,14 @@ final class ASCIIEncoder implements Encoder {
   @Override
   public void encode(EncoderContext context) {
     //step B
-    int n = HighLevelEncoder.determineConsecutiveDigitCount(context.getMessage(), context.data.pos);
+    int n = HighLevelEncoder.determineConsecutiveDigitCount(context.getMessage(), context.pos);
     if (n >= 2) {
-      context.writeCodeword(encodeASCIIDigits(context.getMessage().charAt(context.data.pos),
-                                              context.getMessage().charAt(context.data.pos + 1)));
-      context.data.pos += 2;
+      context.writeCodeword(encodeASCIIDigits(context.getMessage().charAt(context.pos),
+                                              context.getMessage().charAt(context.pos + 1)));
+      context.pos += 2;
     } else {
       char c = context.getCurrentChar();
-      int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.data.pos, getEncodingMode());
+      int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.pos, getEncodingMode());
       if (newMode != getEncodingMode()) {
         switch (newMode) {
           case HighLevelEncoder.BASE256_ENCODATION:
@@ -62,10 +62,10 @@ final class ASCIIEncoder implements Encoder {
       } else if (HighLevelEncoder.isExtendedASCII(c)) {
         context.writeCodeword(HighLevelEncoder.UPPER_SHIFT);
         context.writeCodeword((char) (c - 128 + 1));
-        context.data.pos++;
+        context.pos++;
       } else {
         context.writeCodeword((char) (c + 1));
-        context.data.pos++;
+        context.pos++;
       }
 
     }
