@@ -33,13 +33,13 @@ public final class TextParsedResult extends ParsedResult {
     this.language = language;
   }
 
-  public String getText() {
-    return text;
-  }
+//  public String getText() {
+//    return text;
+//  }
 
-  public String getLanguage() {
-    return language;
-  }
+//  public String getLanguage() {
+//    return language;
+//  }
 
   @Override
   public String getDisplayResult() {

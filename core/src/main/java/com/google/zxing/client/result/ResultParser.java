@@ -224,12 +224,7 @@ public abstract class ResultParser {
             matches = new ArrayList<>(3); // lazy init
           }
           String element = unescapeBackslash(rawText.substring(start, i));
-          if (trim) {
-            element = element.trim();
-          }
-          if (!element.isEmpty()) {
-            matches.add(element);
-          }
+          matchPrefixedFieldRefactor(trim, matches, element);
           i++;
           more = false;
         }
@@ -240,6 +235,15 @@ public abstract class ResultParser {
     }
     return matches.toArray(EMPTY_STR_ARRAY);
   }
+
+private static void matchPrefixedFieldRefactor(boolean trim, List<String> matches, String element) {
+	if (trim) {
+	    element = element.trim();
+	  }
+	  if (!element.isEmpty()) {
+	    matches.add(element);
+	  }
+}
 
   private static int countPrecedingBackslashes(CharSequence s, int pos) {
     int count = 0;

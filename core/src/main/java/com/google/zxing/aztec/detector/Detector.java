@@ -104,17 +104,17 @@ public final class Detector {
    * @throws NotFoundException in case of too many errors or invalid parameters
    */
   private void extractParameters(ResultPoint[] bullsEyeCorners) throws NotFoundException {
-    if (!isValid(bullsEyeCorners[0]) || !isValid(bullsEyeCorners[1]) ||
-        !isValid(bullsEyeCorners[2]) || !isValid(bullsEyeCorners[3])) {
+    if (!bullsEyeCorners[0].isValidRefactorEnvy(image) || !bullsEyeCorners[1].isValidRefactorEnvy(image) ||
+        !bullsEyeCorners[2].isValidRefactorEnvy(image) || !bullsEyeCorners[3].isValidRefactorEnvy(image)) {
       throw NotFoundException.getNotFoundInstance();
     }
     int length = 2 * nbCenterLayers;
     // Get the bits around the bull's eye
     int[] sides = {
-        sampleLine(bullsEyeCorners[0], bullsEyeCorners[1], length), // Right side
-        sampleLine(bullsEyeCorners[1], bullsEyeCorners[2], length), // Bottom
-        sampleLine(bullsEyeCorners[2], bullsEyeCorners[3], length), // Left side
-        sampleLine(bullsEyeCorners[3], bullsEyeCorners[0], length)  // Top
+        bullsEyeCorners[0].sampleLineRefactorEnvy(bullsEyeCorners[1], length, image), // Right side
+        bullsEyeCorners[1].sampleLineRefactorEnvy(bullsEyeCorners[2], length, image), // Bottom
+        bullsEyeCorners[2].sampleLineRefactorEnvy(bullsEyeCorners[3], length, image), // Left side
+        bullsEyeCorners[3].sampleLineRefactorEnvy(bullsEyeCorners[0], length, image)  // Top
     };
 
     // bullsEyeCorners[shift] is the corner of the bulls'eye that has three
@@ -390,31 +390,6 @@ public final class Detector {
   }
 
   /**
-   * Samples a line.
-   *
-   * @param p1   start point (inclusive)
-   * @param p2   end point (exclusive)
-   * @param size number of bits
-   * @return the array of bits as an int (first bit is high-order bit of result)
-   */
-  private int sampleLine(ResultPoint p1, ResultPoint p2, int size) {
-    int result = 0;
-
-    float d = distance(p1, p2);
-    float moduleSize = d / size;
-    float px = p1.getX();
-    float py = p1.getY();
-    float dx = moduleSize * (p2.getX() - p1.getX()) / d;
-    float dy = moduleSize * (p2.getY() - p1.getY()) / d;
-    for (int i = 0; i < size; i++) {
-      if (image.get(MathUtils.round(px + i * dx), MathUtils.round(py + i * dy))) {
-        result |= 1 << (size - i - 1);
-      }
-    }
-    return result;
-  }
-
-  /**
    * @return true if the border of the rectangle passed in parameter is compound of white points only
    *         or black points only
    */
@@ -432,65 +407,28 @@ public final class Detector {
     p4 = new Point(Math.min(image.getWidth() - 1, p4.getX() + corr),
                    Math.min(image.getHeight() - 1, p4.getY() + corr));
 
-    int cInit = getColor(p4, p1);
+    int cInit = p4.getColorRefactorEnvy(p1, image);
 
     if (cInit == 0) {
       return false;
     }
 
-    int c = getColor(p1, p2);
+    int c = p1.getColorRefactorEnvy(p2, image);
 
     if (c != cInit) {
       return false;
     }
 
-    c = getColor(p2, p3);
+    c = p2.getColorRefactorEnvy(p3, image);
 
     if (c != cInit) {
       return false;
     }
 
-    c = getColor(p3, p4);
+    c = p3.getColorRefactorEnvy(p4, image);
 
     return c == cInit;
 
-  }
-
-  /**
-   * Gets the color of a segment
-   *
-   * @return 1 if segment more than 90% black, -1 if segment is more than 90% white, 0 else
-   */
-  private int getColor(Point p1, Point p2) {
-    float d = distance(p1, p2);
-    if (d == 0.0f) {
-      return 0;
-    }
-    float dx = (p2.getX() - p1.getX()) / d;
-    float dy = (p2.getY() - p1.getY()) / d;
-    int error = 0;
-
-    float px = p1.getX();
-    float py = p1.getY();
-
-    boolean colorModel = image.get(p1.getX(), p1.getY());
-
-    int iMax = (int) Math.floor(d);
-    for (int i = 0; i < iMax; i++) {
-      if (image.get(MathUtils.round(px), MathUtils.round(py)) != colorModel) {
-        error++;
-      }
-      px += dx;
-      py += dy;
-    }
-
-    float errRatio = error / d;
-
-    if (errRatio > 0.1f && errRatio < 0.9f) {
-      return 0;
-    }
-
-    return (errRatio <= 0.1f) == colorModel ? 1 : -1;
   }
 
   /**
@@ -500,7 +438,7 @@ public final class Detector {
     int x = init.getX() + dx;
     int y = init.getY() + dy;
 
-    while (isValid(x, y) && image.get(x, y) == color) {
+    while (image.isValidRefactorEnvy(x, y) && image.get(x, y) == color) {
       x += dx;
       y += dy;
     }
@@ -508,12 +446,12 @@ public final class Detector {
     x -= dx;
     y -= dy;
 
-    while (isValid(x, y) && image.get(x, y) == color) {
+    while (image.isValidRefactorEnvy(x, y) && image.get(x, y) == color) {
       x += dx;
     }
     x -= dx;
 
-    while (isValid(x, y) && image.get(x, y) == color) {
+    while (image.isValidRefactorEnvy(x, y) && image.get(x, y) == color) {
       y += dy;
     }
     y -= dy;
@@ -549,21 +487,11 @@ public final class Detector {
     return new ResultPoint[]{result0, result1, result2, result3};
   }
 
-  private boolean isValid(int x, int y) {
-    return x >= 0 && x < image.getWidth() && y >= 0 && y < image.getHeight();
-  }
-
-  private boolean isValid(ResultPoint point) {
-    int x = MathUtils.round(point.getX());
-    int y = MathUtils.round(point.getY());
-    return isValid(x, y);
-  }
-
-  private static float distance(Point a, Point b) {
+  public static float distance(Point a, Point b) {
     return MathUtils.distance(a.getX(), a.getY(), b.getX(), b.getY());
   }
 
-  private static float distance(ResultPoint a, ResultPoint b) {
+  public static float distance(ResultPoint a, ResultPoint b) {
     return MathUtils.distance(a.getX(), a.getY(), b.getX(), b.getY());
   }
 
@@ -599,5 +527,36 @@ public final class Detector {
     public String toString() {
       return "<" + x + ' ' + y + '>';
     }
+
+	/**
+	 * Gets the color of a segment
+	 * @param image
+	 * @return  1 if segment more than 90% black, -1 if segment is more than 90% white, 0 else
+	 */
+	public int getColorRefactorEnvy(Point p2, BitMatrix image) {
+		float d = Detector.distance(this, p2);
+		if (d == 0.0f) {
+			return 0;
+		}
+		float dx = (p2.getX() - getX()) / d;
+		float dy = (p2.getY() - getY()) / d;
+		int error = 0;
+		float px = getX();
+		float py = getY();
+		boolean colorModel = image.get(getX(), getY());
+		int iMax = (int) Math.floor(d);
+		for (int i = 0; i < iMax; i++) {
+			if (image.get(MathUtils.round(px), MathUtils.round(py)) != colorModel) {
+				error++;
+			}
+			px += dx;
+			py += dy;
+		}
+		float errRatio = error / d;
+		if (errRatio > 0.1f && errRatio < 0.9f) {
+			return 0;
+		}
+		return (errRatio <= 0.1f) == colorModel ? 1 : -1;
+	}
   }
 }
