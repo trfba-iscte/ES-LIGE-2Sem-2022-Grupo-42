@@ -16,6 +16,7 @@
 
 package com.google.zxing.common;
 
+import com.google.zxing.ResultPoint;
 import java.util.Arrays;
 
 /**
@@ -528,5 +529,9 @@ private int bit(int theBits) {
   public BitMatrix clone() {
     return new BitMatrix(width, height, rowSize, bits.clone());
   }
+
+public boolean isValid(ResultPoint p) {
+	return p.getX() >= 0 && p.getX() <= getWidth() - 1 && p.getY() > 0 && p.getY() <= getHeight() - 1;
+}
 
 }

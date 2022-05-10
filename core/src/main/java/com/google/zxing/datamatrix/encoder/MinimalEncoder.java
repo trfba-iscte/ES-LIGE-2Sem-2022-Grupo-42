@@ -154,9 +154,9 @@ public final class MinimalEncoder {
   }
 
   static void addEdge(Edge[][] edges, Edge edge) {
-    int vertexIndex = edge.fromPosition + edge.characterLength;
+    int vertexIndex = edge.data.data.fromPosition + edge.data.data.characterLength;
     if (edges[vertexIndex][edge.getEndMode().ordinal()] == null ||
-        edges[vertexIndex][edge.getEndMode().ordinal()].cachedTotalSize > edge.cachedTotalSize) {
+        edges[vertexIndex][edge.getEndMode().ordinal()].data.data.cachedTotalSize > edge.data.data.cachedTotalSize) {
       edges[vertexIndex][edge.getEndMode().ordinal()] = edge;
     }
   }
@@ -176,19 +176,7 @@ public final class MinimalEncoder {
         return 0;
       }
       char ci = input.charAt(i);
-      if (c40 && HighLevelEncoder.isNativeC40(ci) || !c40 && HighLevelEncoder.isNativeText(ci)) {
-        thirdsCount++; //native
-      } else if (!isExtendedASCII(ci, input.getFNC1Character())) {
-        thirdsCount += 2; //shift
-      } else {
-        int asciiValue = ci & 0xff;
-        if (asciiValue >= 128 && (c40 && HighLevelEncoder.isNativeC40((char) (asciiValue - 128)) ||
-                                  !c40 && HighLevelEncoder.isNativeText((char) (asciiValue - 128)))) {
-          thirdsCount += 3; // shift, Upper shift
-        } else {
-          thirdsCount += 4; // shift, Upper shift, shift
-        }
-      }
+      thirdsCount = getNumberOfC40WordsRefactoring(input, c40, thirdsCount, ci);
 
       if (thirdsCount % 3 == 0 || ((thirdsCount - 2) % 3 == 0 && i + 1 == input.length())) {
         characterLength[0] = i - from + 1;
@@ -198,6 +186,28 @@ public final class MinimalEncoder {
     characterLength[0] = 0;
     return 0;
   }
+
+private static int getNumberOfC40WordsRefactoring(Input input, boolean c40, int thirdsCount, char ci) {
+	if (c40 && HighLevelEncoder.isNativeC40(ci) || !c40 && HighLevelEncoder.isNativeText(ci)) {
+        thirdsCount++; //native
+      } else if (!isExtendedASCII(ci, input.getFNC1Character())) {
+        thirdsCount += 2; //shift
+      } else {
+        int asciiValue = ci & 0xff;
+        thirdsCount = getNumberOfC40WordsRefactoring(c40, thirdsCount, asciiValue);
+      }
+	return thirdsCount;
+}
+
+private static int getNumberOfC40WordsRefactoring(boolean c40, int thirdsCount, int asciiValue) {
+	if (asciiValue >= 128 && (c40 && HighLevelEncoder.isNativeC40((char) (asciiValue - 128)) ||
+	                          !c40 && HighLevelEncoder.isNativeText((char) (asciiValue - 128)))) {
+	  thirdsCount += 3; // shift, Upper shift
+	} else {
+	  thirdsCount += 4; // shift, Upper shift, shift
+	}
+	return thirdsCount;
+}
 
   static void addEdges(Input input, Edge[][] edges, int from, Edge previous) {
 
@@ -209,14 +219,7 @@ public final class MinimalEncoder {
     char ch = input.charAt(from);
     if (previous == null || previous.getEndMode() != Mode.EDF) { //not possible to unlatch a full EDF edge to something
                                                                  //else
-      if (HighLevelEncoder.isDigit(ch) && input.haveNCharacters(from, 2) &&
-          HighLevelEncoder.isDigit(input.charAt(from + 1))) {
-        // two digits ASCII encoded
-        addEdge(edges, new Edge(input, Mode.ASCII, from, 2, previous));
-      } else {
-        // one ASCII encoded character or an extended character via Upper Shift
-        addEdge(edges, new Edge(input, Mode.ASCII, from, 1, previous));
-      }
+      addEdgesRefactoring(input, edges, from, previous, ch);
   
       Mode[] modes = {Mode.C40, Mode.TEXT};
       for (Mode mode : modes) {
@@ -226,12 +229,7 @@ public final class MinimalEncoder {
         }
       }
   
-      if (input.haveNCharacters(from,3) &&
-          HighLevelEncoder.isNativeX12(input.charAt(from)) &&
-          HighLevelEncoder.isNativeX12(input.charAt(from + 1)) &&
-          HighLevelEncoder.isNativeX12(input.charAt(from + 2))) {
-        addEdge(edges, new Edge(input, Mode.X12, from, 3, previous));
-      }
+      addEdgesRefactoring(input, edges, from, previous);
 
       addEdge(edges, new Edge(input, Mode.B256, from, 1, previous));
     }
@@ -247,10 +245,34 @@ public final class MinimalEncoder {
         break;
       }
     }
-    if (i == 3 && input.haveNCharacters(from, 4) && HighLevelEncoder.isNativeEDIFACT(input.charAt(from + 3))) {
+    addEdgesRefactoring(input, edges, from, previous, i);
+  }
+
+private static void addEdgesRefactoring(Input input, Edge[][] edges, int from, Edge previous, int i) {
+	if (i == 3 && input.haveNCharacters(from, 4) && HighLevelEncoder.isNativeEDIFACT(input.charAt(from + 3))) {
       addEdge(edges, new Edge(input, Mode.EDF, from, 4, previous));
     }
-  }
+}
+
+private static void addEdgesRefactoring(Input input, Edge[][] edges, int from, Edge previous) {
+	if (input.haveNCharacters(from,3) &&
+          HighLevelEncoder.isNativeX12(input.charAt(from)) &&
+          HighLevelEncoder.isNativeX12(input.charAt(from + 1)) &&
+          HighLevelEncoder.isNativeX12(input.charAt(from + 2))) {
+        addEdge(edges, new Edge(input, Mode.X12, from, 3, previous));
+      }
+}
+
+private static void addEdgesRefactoring(Input input, Edge[][] edges, int from, Edge previous, char ch) {
+	if (HighLevelEncoder.isDigit(ch) && input.haveNCharacters(from, 2) &&
+          HighLevelEncoder.isDigit(input.charAt(from + 1))) {
+        // two digits ASCII encoded
+        addEdge(edges, new Edge(input, Mode.ASCII, from, 2, previous));
+      } else {
+        // one ASCII encoded character or an extended character via Upper Shift
+        addEdge(edges, new Edge(input, Mode.ASCII, from, 1, previous));
+      }
+}
   static Result encodeMinimally(Input input) {
 
     @SuppressWarnings("checkstyle:lineLength")
@@ -446,11 +468,7 @@ public final class MinimalEncoder {
     addEdges(input, edges, 0, null);
 
     for (int i = 1; i <= inputLength; i++) {
-      for (int j = 0; j < 6; j++) {
-        if (edges[i][j] != null && i < inputLength) {
-          addEdges(input, edges, i, edges[i][j]);
-        }
-      }
+      encodeMinimallyRefactoring(input, inputLength, edges, i);
       //optimize memory by removing edges that have been passed.
       for (int j = 0; j < 6; j++) {
         edges[i - 1][j] = null;
@@ -462,7 +480,7 @@ public final class MinimalEncoder {
     for (int j = 0; j < 6; j++) {
       if (edges[inputLength][j] != null) {
         Edge edge = edges[inputLength][j];
-        int size = j >= 1 && j <= 3 ? edge.cachedTotalSize + 1 : edge.cachedTotalSize; //C40, TEXT and X12 need an
+        int size = j >= 1 && j <= 3 ? edge.data.data.cachedTotalSize + 1 : edge.data.data.cachedTotalSize; //C40, TEXT and X12 need an
                                                                                        // extra unlatch at the end
         if (size < minimalSize) {
           minimalSize = size;
@@ -477,6 +495,14 @@ public final class MinimalEncoder {
     return new Result(edges[inputLength][minimalJ]);
   }
 
+private static void encodeMinimallyRefactoring(Input input, int inputLength, Edge[][] edges, int i) {
+	for (int j = 0; j < 6; j++) {
+        if (edges[i][j] != null && i < inputLength) {
+          addEdges(input, edges, i, edges[i][j]);
+        }
+      }
+}
+
   private static final class Edge {
     private static final int[] allCodewordCapacities = {3, 5, 8, 10, 12, 16, 18, 22, 30, 32, 36, 44, 49, 62, 86, 114,
                                                         144, 174, 204, 280, 368, 456, 576, 696, 816, 1050, 1304, 1558};
@@ -484,21 +510,18 @@ public final class MinimalEncoder {
                                                            280, 368, 456, 576, 696, 816, 1050, 1304, 1558};
     private static final int[] rectangularCodewordCapacities = {5, 10, 16, 33, 32, 49};
     private final Input input;
-    private final Mode mode; //the mode at the start of this edge.
-    private final int fromPosition;
-    private final int characterLength;
     private final Edge previous;
-    private final int cachedTotalSize;
+    private EdgeDataRefactoring data = new EdgeDataRefactoring(new EdgeData());
 
-    private Edge(Input input, Mode mode, int fromPosition, int characterLength, Edge previous) {
+	private Edge(Input input, Mode mode, int fromPosition, int characterLength, Edge previous) {
       this.input = input;
-      this.mode = mode;
-      this.fromPosition = fromPosition;
-      this.characterLength = characterLength;
+      this.data.data.mode = mode;
+      this.data.data.fromPosition = fromPosition;
+      this.data.data.characterLength = characterLength;
       this.previous = previous;
       assert fromPosition + characterLength <= input.length();
 
-      int size = previous != null ? previous.cachedTotalSize : 0;
+      int size = previous != null ? previous.data.data.cachedTotalSize : 0;
 
       Mode previousMode = getPreviousMode();
 
@@ -519,34 +542,48 @@ public final class MinimalEncoder {
       switch (mode) {
         case ASCII:
           size++;
-          if (input.isECI(fromPosition) || isExtendedASCII(input.charAt(fromPosition), input.getFNC1Character())) {
-            size++;
-          }
-          if (previousMode == Mode.C40 ||
-              previousMode == Mode.TEXT ||
-              previousMode == Mode.X12) {
-            size++; // unlatch 254 to ASCII
-          }
+          size = edgeRefactoring(input, fromPosition, size);
+          size = edgeRefactoring3(size, previousMode);
           break;
         case B256:
           size++;
-          if (previousMode != Mode.B256) {
-            size++; //byte count
-          } else if (getB256Size() == 250) {
-            size++; //extra byte count
-          }
-          if (previousMode == Mode.ASCII) {
-            size++; //latch to B256
-          } else if (previousMode == Mode.C40 ||
-                     previousMode == Mode.TEXT ||
-                     previousMode == Mode.X12) {
-            size += 2; //unlatch to ASCII, latch to B256
-          }
+          size = edgeRefactoring(size, previousMode);
           break;
         case C40:
         case TEXT:
         case X12:
-          if (mode == Mode.X12) {
+          size = edgeRefactoring1(input, mode, fromPosition, size, previousMode);
+          break;
+        case EDF:
+          size += 3;
+          size = edgeRefactoring2(size, previousMode);
+          break;
+      }
+      data.data.cachedTotalSize = size;
+    }
+
+	private int edgeRefactoring3(int size, Mode previousMode) {
+		if (previousMode == Mode.C40 ||
+              previousMode == Mode.TEXT ||
+              previousMode == Mode.X12) {
+            size++; // unlatch 254 to ASCII
+          }
+		return size;
+	}
+
+	private int edgeRefactoring2(int size, Mode previousMode) {
+		if (previousMode == Mode.ASCII || previousMode == Mode.B256) {
+            size++; //additional byte for latch from ASCII to this mode
+          } else if (previousMode == Mode.C40 ||
+                    previousMode == Mode.TEXT ||
+                    previousMode == Mode.X12) {
+            size += 2; //unlatch 254 to ASCII followed by latch to this mode
+          }
+		return size;
+	}
+
+	private int edgeRefactoring1(Input input, Mode mode, int fromPosition, int size, Mode previousMode) {
+		if (mode == Mode.X12) {
             size += 2;
           } else {
             int[] charLen = new int[1];
@@ -560,26 +597,37 @@ public final class MinimalEncoder {
                                              previousMode == Mode.X12)) {
             size += 2; //unlatch 254 to ASCII followed by latch to this mode
           }
-          break;
-        case EDF:
-          size += 3;
-          if (previousMode == Mode.ASCII || previousMode == Mode.B256) {
-            size++; //additional byte for latch from ASCII to this mode
-          } else if (previousMode == Mode.C40 ||
-                    previousMode == Mode.TEXT ||
-                    previousMode == Mode.X12) {
-            size += 2; //unlatch 254 to ASCII followed by latch to this mode
+		return size;
+	}
+
+	private int edgeRefactoring(int size, Mode previousMode) {
+		if (previousMode != Mode.B256) {
+            size++; //byte count
+          } else if (getB256Size() == 250) {
+            size++; //extra byte count
           }
-          break;
-      }
-      cachedTotalSize = size;
-    }
+          if (previousMode == Mode.ASCII) {
+            size++; //latch to B256
+          } else if (previousMode == Mode.C40 ||
+                     previousMode == Mode.TEXT ||
+                     previousMode == Mode.X12) {
+            size += 2; //unlatch to ASCII, latch to B256
+          }
+		return size;
+	}
+
+	private int edgeRefactoring(Input input, int fromPosition, int size) {
+		if (input.isECI(fromPosition) || isExtendedASCII(input.charAt(fromPosition), input.getFNC1Character())) {
+            size++;
+          }
+		return size;
+	}
 
     // does not count beyond 250
     int getB256Size() {
       int cnt = 0;
       Edge current = this;
-      while (current != null && current.mode == Mode.B256 && cnt <= 250) {
+      while (current != null && current.data.data.mode == Mode.B256 && cnt <= 250) {
         cnt++;
         current = current.previous;
       }
@@ -587,7 +635,7 @@ public final class MinimalEncoder {
     }
 
     Mode getPreviousStartMode() {
-      return  previous == null ? Mode.ASCII : previous.mode;
+      return  previous == null ? Mode.ASCII : previous.data.data.mode;
     }
 
     Mode getPreviousMode() {
@@ -601,33 +649,37 @@ public final class MinimalEncoder {
      *  Returns mode in all other cases.
      * */
     Mode getEndMode() {
-      if (mode == Mode.EDF) {
-        if (characterLength < 4) {
+      if (data.data.mode == Mode.EDF) {
+        if (data.data.characterLength < 4) {
           return Mode.ASCII;
         }
         int lastASCII = getLastASCII(); // see 5.2.8.2 EDIFACT encodation Rules
-        if (lastASCII > 0 && getCodewordsRemaining(cachedTotalSize + lastASCII) <= 2 - lastASCII) {
+        if (lastASCII > 0 && getCodewordsRemaining(data.data.cachedTotalSize + lastASCII) <= 2 - lastASCII) {
           return Mode.ASCII;
         }
       }
-      if (mode == Mode.C40 ||
-          mode == Mode.TEXT ||
-          mode == Mode.X12) {
+      if (getEndModeRefactoring()) {
 
         // see 5.2.5.2 C40 encodation rules and 5.2.7.2 ANSI X12 encodation rules
-        if (fromPosition + characterLength >= input.length() && getCodewordsRemaining(cachedTotalSize) == 0) {
+        if (data.data.fromPosition + data.data.characterLength >= input.length() && getCodewordsRemaining(data.data.cachedTotalSize) == 0) {
           return Mode.ASCII; 
         }
         int lastASCII = getLastASCII();
-        if (lastASCII == 1 && getCodewordsRemaining(cachedTotalSize + 1) == 0) {
+        if (lastASCII == 1 && getCodewordsRemaining(data.data.cachedTotalSize + 1) == 0) {
           return Mode.ASCII;
         }
       }
-      return mode;
+      return data.data.mode;
     }
 
+	private boolean getEndModeRefactoring() {
+		return data.data.mode == Mode.C40 ||
+		      data.data.mode == Mode.TEXT ||
+		      data.data.mode == Mode.X12;
+	}
+
     Mode getMode() {
-      return mode;
+      return data.data.mode;
     }
 
     /** Peeks ahead and returns 1 if the postfix consists of exactly two digits, 2 if the postfix consists of exactly
@@ -636,7 +688,7 @@ public final class MinimalEncoder {
      **/
     int getLastASCII() {
       int length = input.length();
-      int from = fromPosition + characterLength;
+      int from = data.data.fromPosition + data.data.characterLength;
       if (length - from > 4 || from >= length) {
         return 0;
       }
@@ -738,12 +790,12 @@ public final class MinimalEncoder {
     }
 
     byte[] getX12Words() {
-      assert characterLength % 3 == 0;
-      byte[] result = new byte[characterLength / 3 * 2];
+      assert data.data.characterLength % 3 == 0;
+      byte[] result = new byte[data.data.characterLength / 3 * 2];
       for (int i = 0; i < result.length; i += 2) {
-        setC40Word(result,i,getX12Value(input.charAt(fromPosition + i / 2 * 3)),
-                              getX12Value(input.charAt(fromPosition + i / 2 * 3 + 1)),
-                              getX12Value(input.charAt(fromPosition + i / 2 * 3 + 2)));
+        setC40Word(result,i,getX12Value(input.charAt(data.data.fromPosition + i / 2 * 3)),
+                              getX12Value(input.charAt(data.data.fromPosition + i / 2 * 3 + 1)),
+                              getX12Value(input.charAt(data.data.fromPosition + i / 2 * 3 + 2)));
       }
       return result;
     }
@@ -761,14 +813,7 @@ public final class MinimalEncoder {
         return  27;
       }
       if (c40) {
-        return c <= 31 ? c :
-               c == 32 ? 3 :
-               c <= 47 ? c - 33 :
-               c <= 57 ? c - 44 :
-               c <= 64 ? c - 43 :
-               c <= 90 ? c - 51 :
-               c <= 95 ? c - 69 :
-               c <= 127 ? c - 96 : c;
+        return getC40Value(c);
       } else {
         return c == 0 ? 0 :
                setIndex == 0 && c <= 3 ? c - 1 : //is this a bug in the spec?
@@ -785,10 +830,21 @@ public final class MinimalEncoder {
       }
     }
 
+	private static int getC40Value(char c) {
+		return c <= 31 ? c :
+               c == 32 ? 3 :
+               c <= 47 ? c - 33 :
+               c <= 57 ? c - 44 :
+               c <= 64 ? c - 43 :
+               c <= 90 ? c - 51 :
+               c <= 95 ? c - 69 :
+               c <= 127 ? c - 96 : c;
+	}
+
     byte[] getC40Words(boolean c40, int fnc1) {
       List<Byte> c40Values = new ArrayList<>();
-      for (int i = 0; i < characterLength; i++) {
-        char ci = input.charAt(fromPosition + i);
+      for (int i = 0; i < data.data.characterLength; i++) {
+        char ci = input.charAt(data.data.fromPosition + i);
         if (c40 && HighLevelEncoder.isNativeC40(ci) || !c40 && HighLevelEncoder.isNativeText(ci)) {
           c40Values.add((byte) getC40Value(c40, 0, ci, fnc1));
         } else if (!isExtendedASCII(ci, fnc1)) {
@@ -797,23 +853,12 @@ public final class MinimalEncoder {
           c40Values.add((byte) getC40Value(c40, shiftValue, ci, fnc1));
         } else {
           char asciiValue = (char) ((ci & 0xff) - 128);
-          if (c40 && HighLevelEncoder.isNativeC40(asciiValue) ||
-              !c40 && HighLevelEncoder.isNativeText(asciiValue)) {
-            c40Values.add((byte) 1); //Shift 2
-            c40Values.add((byte) 30); //Upper Shift
-            c40Values.add((byte) getC40Value(c40, 0, asciiValue, fnc1));
-          } else {
-            c40Values.add((byte) 1); //Shift 2
-            c40Values.add((byte) 30); //Upper Shift
-            int shiftValue = getShiftValue(asciiValue, c40, fnc1);
-            c40Values.add((byte) shiftValue); // Shift[123]
-            c40Values.add((byte) getC40Value(c40, shiftValue, asciiValue, fnc1));
-          }
+          getC40WordsRefactoring(c40, fnc1, c40Values, asciiValue);
         }
       }
 
       if ((c40Values.size() % 3) != 0) {
-        assert (c40Values.size() - 2) % 3 == 0 && fromPosition + characterLength == input.length();
+        assert (c40Values.size() - 2) % 3 == 0 && data.data.fromPosition + data.data.characterLength == input.length();
         c40Values.add((byte) 0); // pad with 0 (Shift 1)
       }
 
@@ -826,11 +871,26 @@ public final class MinimalEncoder {
       return result;
     }
 
+	private void getC40WordsRefactoring(boolean c40, int fnc1, List<Byte> c40Values, char asciiValue) {
+		if (c40 && HighLevelEncoder.isNativeC40(asciiValue) ||
+              !c40 && HighLevelEncoder.isNativeText(asciiValue)) {
+            c40Values.add((byte) 1); //Shift 2
+            c40Values.add((byte) 30); //Upper Shift
+            c40Values.add((byte) getC40Value(c40, 0, asciiValue, fnc1));
+          } else {
+            c40Values.add((byte) 1); //Shift 2
+            c40Values.add((byte) 30); //Upper Shift
+            int shiftValue = getShiftValue(asciiValue, c40, fnc1);
+            c40Values.add((byte) shiftValue); // Shift[123]
+            c40Values.add((byte) getC40Value(c40, shiftValue, asciiValue, fnc1));
+          }
+	}
+
     byte[] getEDFBytes() {
-      int numberOfThirds = (int) Math.ceil(characterLength / 4.0);
+      int numberOfThirds = (int) Math.ceil(data.data.characterLength / 4.0);
       byte[] result = new byte[numberOfThirds * 3];
-      int pos = fromPosition;
-      int endPos = Math.min(fromPosition + characterLength - 1 , input.length() - 1);
+      int pos = data.data.fromPosition;
+      int endPos = Math.min(data.data.fromPosition + data.data.characterLength - 1 , input.length() - 1);
       for (int i = 0; i < numberOfThirds; i += 3) {
         int[] edfValues = new int[4];
         for (int j = 0; j < 4; j++) {
@@ -855,7 +915,7 @@ public final class MinimalEncoder {
       switch (getPreviousMode()) {
         case ASCII:
         case B256: //after B256 ends (via length) we are back to ASCII
-          switch (mode) {
+          switch (data.data.mode) {
             case B256:
               return getBytes(231);
             case C40:
@@ -871,8 +931,8 @@ public final class MinimalEncoder {
         case C40:
         case TEXT:
         case X12:
-          if (mode != getPreviousMode()) {
-            switch (mode) {
+          if (data.data.mode != getPreviousMode()) {
+            switch (data.data.mode) {
               case ASCII:
                 return getBytes(254);
               case B256:
@@ -889,7 +949,7 @@ public final class MinimalEncoder {
           }
           break;
         case EDF:
-          assert mode == Mode.EDF; //The rightmost EDIFACT edge always contains an unlatch character
+          assert data.data.mode == Mode.EDF; //The rightmost EDIFACT edge always contains an unlatch character
           break;
       }
       return new byte[0];
@@ -897,21 +957,11 @@ public final class MinimalEncoder {
 
     // Important: The function does not return the length bytes (one or two) in case of B256 encoding
     byte[] getDataBytes() {
-      switch (mode) {
+      switch (data.data.mode) {
         case ASCII:
-          if (input.isECI(fromPosition)) {
-            return getBytes(241,input.getECIValue(fromPosition) + 1);
-          } else if (isExtendedASCII(input.charAt(fromPosition), input.getFNC1Character())) {
-            return getBytes(235,input.charAt(fromPosition) - 127);
-          } else if (characterLength == 2) {
-            return getBytes((input.charAt(fromPosition) - '0') * 10 + input.charAt(fromPosition + 1) - '0' + 130);
-          } else if (input.isFNC1(fromPosition)) {
-            return getBytes(232);
-          } else {
-            return getBytes(input.charAt(fromPosition) + 1);
-          }
+          return getDataBytesRefactoring();
         case B256:
-          return getBytes(input.charAt(fromPosition));
+          return getBytes(input.charAt(data.data.fromPosition));
         case C40:
           return getC40Words(true, input.getFNC1Character());
         case TEXT:
@@ -924,6 +974,20 @@ public final class MinimalEncoder {
       assert false;
       return new byte[0];
     }
+
+	private byte[] getDataBytesRefactoring() {
+		if (input.isECI(data.data.fromPosition)) {
+            return getBytes(241,input.getECIValue(data.data.fromPosition) + 1);
+          } else if (isExtendedASCII(input.charAt(data.data.fromPosition), input.getFNC1Character())) {
+            return getBytes(235,input.charAt(data.data.fromPosition) - 127);
+          } else if (data.data.characterLength == 2) {
+            return getBytes((input.charAt(data.data.fromPosition) - '0') * 10 + input.charAt(data.data.fromPosition + 1) - '0' + 130);
+          } else if (input.isFNC1(data.data.fromPosition)) {
+            return getBytes(232);
+          } else {
+            return getBytes(input.charAt(data.data.fromPosition) + 1);
+          }
+	}
   }
 
   private static final class Result {
@@ -936,9 +1000,9 @@ public final class MinimalEncoder {
       List<Byte> bytesAL = new ArrayList<>();
       List<Integer> randomizePostfixLength = new ArrayList<>();
       List<Integer> randomizeLengths = new ArrayList<>();
-      if ((solution.mode == Mode.C40 ||
-           solution.mode == Mode.TEXT ||
-           solution.mode == Mode.X12) &&
+      if ((solution.data.data.mode == Mode.C40 ||
+           solution.data.data.mode == Mode.TEXT ||
+           solution.data.data.mode == Mode.X12) &&
            solution.getEndMode() != Mode.ASCII) {
         size += prepend(MinimalEncoder.Edge.getBytes(254),bytesAL);
       }
@@ -948,14 +1012,7 @@ public final class MinimalEncoder {
 
         if (current.previous == null || current.getPreviousStartMode() != current.getMode()) {
           if (current.getMode() == Mode.B256) {
-            if (size <= 249) {
-              bytesAL.add(0, (byte) size);
-              size++;
-            } else {
-              bytesAL.add(0, (byte) (size % 250));
-              bytesAL.add(0, (byte) (size / 250 + 249));
-              size += 2;
-            }
+            size = resultRefactoring(size, bytesAL);
             randomizePostfixLength.add(bytesAL.size());
             randomizeLengths.add(size);
           }
@@ -965,34 +1022,59 @@ public final class MinimalEncoder {
 
         current = current.previous;
       }
-      if (input.getMacroId() == 5) {
-        size += prepend(MinimalEncoder.Edge.getBytes(236), bytesAL);
-      } else if (input.getMacroId() == 6) {
-        size += prepend(MinimalEncoder.Edge.getBytes(237), bytesAL);
-      }
+      size = input.resultRefactoring(size, bytesAL);
    
-      if (input.getFNC1Character() > 0) {
-        size += prepend(MinimalEncoder.Edge.getBytes(232), bytesAL);
-      }
-      for (int i = 0; i < randomizePostfixLength.size(); i++) {
-        applyRandomPattern(bytesAL,bytesAL.size() - randomizePostfixLength.get(i), randomizeLengths.get(i));
-      }
+      resultRefactoring2(input, size, bytesAL);
+      resultRefactoring4(bytesAL, randomizePostfixLength, randomizeLengths);
       //add padding
       int capacity = solution.getMinSymbolSize(bytesAL.size());
-      if (bytesAL.size() < capacity) {
-        bytesAL.add((byte) 129);
-      }
+      resultRefactoring1(bytesAL, capacity);
       while (bytesAL.size() < capacity) {
         bytesAL.add((byte) randomize253State(bytesAL.size() + 1));
       }
 
       bytes = new byte[bytesAL.size()];
-      for (int i = 0; i < bytes.length; i++) {
-        bytes[i] = bytesAL.get(i);
-      }
+      resultRefactoring3(bytesAL);
     }
 
-    static int prepend(byte[] bytes, List<Byte> into) {
+	private void resultRefactoring4(List<Byte> bytesAL, List<Integer> randomizePostfixLength,
+			List<Integer> randomizeLengths) {
+		for (int i = 0; i < randomizePostfixLength.size(); i++) {
+		    applyRandomPattern(bytesAL,bytesAL.size() - randomizePostfixLength.get(i), randomizeLengths.get(i));
+		  }
+	}
+
+	private void resultRefactoring3(List<Byte> bytesAL) {
+		for (int i = 0; i < bytes.length; i++) {
+		    bytes[i] = bytesAL.get(i);
+		  }
+	}
+
+	private void resultRefactoring2(Input input, int size, List<Byte> bytesAL) {
+		if (input.getFNC1Character() > 0) {
+		    size += prepend(MinimalEncoder.Edge.getBytes(232), bytesAL);
+		  }
+	}
+
+	private void resultRefactoring1(List<Byte> bytesAL, int capacity) {
+		if (bytesAL.size() < capacity) {
+		    bytesAL.add((byte) 129);
+		  }
+	}
+
+	private int resultRefactoring(int size, List<Byte> bytesAL) {
+		if (size <= 249) {
+		  bytesAL.add(0, (byte) size);
+		  size++;
+		} else {
+		  bytesAL.add(0, (byte) (size % 250));
+		  bytesAL.add(0, (byte) (size / 250 + 249));
+		  size += 2;
+		}
+		return size;
+	}
+
+    public static int prepend(byte[] bytes, List<Byte> into) {
       for (int i = bytes.length - 1; i >= 0; i--) {
         into.add(0, bytes[i]);
       }
@@ -1040,5 +1122,14 @@ public final class MinimalEncoder {
     private SymbolShapeHint getShapeHint() {
       return shape;
     }
+
+	public int resultRefactoring(int size, List<Byte> bytesAL) {
+		if (getMacroId() == 5) {
+			size += Result.prepend(MinimalEncoder.Edge.getBytes(236), bytesAL);
+		} else if (getMacroId() == 6) {
+			size += Result.prepend(MinimalEncoder.Edge.getBytes(237), bytesAL);
+		}
+		return size;
+	}
   }
 }

@@ -23,17 +23,17 @@ final class TextEncoder extends C40Encoder {
     return HighLevelEncoder.TEXT_ENCODATION;
   }
 
-  @Override
+  public @Override
   int encodeChar(char c, StringBuilder sb) {
     if (c == ' ') {
       sb.append('\3');
       return 1;
     }
-    if (c >= '0' && c <= '9') {
+    if (encodeCharRefactoring4(c)) {
       sb.append((char) (c - 48 + 4));
       return 1;
     }
-    if (c >= 'a' && c <= 'z') {
+    if (encodeCharRefactoring(c)) {
       sb.append((char) (c - 97 + 14));
       return 1;
     }
@@ -52,7 +52,7 @@ final class TextEncoder extends C40Encoder {
       sb.append((char) (c - 58 + 15));
       return 2;
     }
-    if (c >= '[' && c <= '_') {
+    if (encodeCharRefactoring2(c)) {
       sb.append('\1'); //Shift 2 Set
       sb.append((char) (c - 91 + 22));
       return 2;
@@ -77,5 +77,17 @@ final class TextEncoder extends C40Encoder {
     len += encodeChar((char) (c - 128), sb);
     return len;
   }
+
+private boolean encodeCharRefactoring4(char c) {
+	return c >= '0' && c <= '9';
+}
+
+private boolean encodeCharRefactoring2(char c) {
+	return c >= '[' && c <= '_';
+}
+
+private boolean encodeCharRefactoring(char c) {
+	return c >= 'a' && c <= 'z';
+}
 
 }

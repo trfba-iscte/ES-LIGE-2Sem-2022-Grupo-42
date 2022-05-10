@@ -24,37 +24,7 @@ class C40Encoder implements Encoder {
   }
 
   void encodeMaximal(EncoderContext context) {
-    StringBuilder buffer = new StringBuilder();
-    int lastCharSize = 0;
-    int backtrackStartPosition = context.pos;
-    int backtrackBufferLength = 0;
-    while (context.hasMoreCharacters()) {
-      char c = context.getCurrentChar();
-      context.pos++;
-      lastCharSize = encodeChar(c, buffer);
-      if (buffer.length() % 3 == 0) {
-        backtrackStartPosition = context.pos;
-        backtrackBufferLength = buffer.length();
-      }
-    }
-    if (backtrackBufferLength != buffer.length()) {
-      int unwritten = (buffer.length() / 3) * 2;
-
-      int curCodewordCount = context.getCodewordCount() + unwritten + 1; // +1 for the latch to C40
-      context.updateSymbolInfo(curCodewordCount);
-      int available = context.getSymbolInfo().getDataCapacity() - curCodewordCount;
-      int rest = buffer.length() % 3;
-      if ((rest == 2 && available != 2) ||
-          (rest == 1 && (lastCharSize > 3 || available != 1))) {
-        buffer.setLength(backtrackBufferLength);
-        context.pos = backtrackStartPosition;
-      }
-    }
-    if (buffer.length() > 0) {
-      context.writeCodeword(HighLevelEncoder.LATCH_TO_C40);
-    }
-  
-    handleEOD(context, buffer);
+    context.encodeMaximal(this);
   }
 
   @Override
@@ -63,7 +33,7 @@ class C40Encoder implements Encoder {
     StringBuilder buffer = new StringBuilder();
     while (context.hasMoreCharacters()) {
       char c = context.getCurrentChar();
-      context.pos++;
+      context.data.pos++;
 
       int lastCharSize = encodeChar(c, buffer);
 
@@ -77,17 +47,17 @@ class C40Encoder implements Encoder {
         //Avoid having a single C40 value in the last triplet
         StringBuilder removed = new StringBuilder();
         if ((buffer.length() % 3) == 2 && available != 2) {
-          lastCharSize = backtrackOneCharacter(context, buffer, removed, lastCharSize);
+          lastCharSize = context.backtrackOneCharacter(buffer, removed, lastCharSize, this);
         }
         while ((buffer.length() % 3) == 1 && (lastCharSize > 3 || available != 1)) {
-          lastCharSize = backtrackOneCharacter(context, buffer, removed, lastCharSize);
+          lastCharSize = context.backtrackOneCharacter(buffer, removed, lastCharSize, this);
         }
         break;
       }
 
       int count = buffer.length();
       if ((count % 3) == 0) {
-        int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.pos, getEncodingMode());
+        int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.data.pos, getEncodingMode());
         if (newMode != getEncodingMode()) {
           // Return to ASCII encodation, which will actually handle latch to new mode
           context.signalEncoderChange(HighLevelEncoder.ASCII_ENCODATION);
@@ -96,17 +66,6 @@ class C40Encoder implements Encoder {
       }
     }
     handleEOD(context, buffer);
-  }
-
-  private int backtrackOneCharacter(EncoderContext context,
-                                    StringBuilder buffer, StringBuilder removed, int lastCharSize) {
-    int count = buffer.length();
-    buffer.delete(count - lastCharSize, count);
-    context.pos--;
-    char c = context.getCurrentChar();
-    lastCharSize = encodeChar(c, removed);
-    context.resetSymbolInfo(); //Deal with possible reduction in symbol size
-    return lastCharSize;
   }
 
   static void writeNextTriplet(EncoderContext context, StringBuilder buffer) {
@@ -120,7 +79,7 @@ class C40Encoder implements Encoder {
    * @param context the encoder context
    * @param buffer  the buffer with the remaining encoded characters
    */
-  void handleEOD(EncoderContext context, StringBuilder buffer) {
+  public void handleEOD(EncoderContext context, StringBuilder buffer) {
     int unwritten = (buffer.length() / 3) * 2;
     int rest = buffer.length() % 3;
 
@@ -133,18 +92,14 @@ class C40Encoder implements Encoder {
       while (buffer.length() >= 3) {
         writeNextTriplet(context, buffer);
       }
-      if (context.hasMoreCharacters()) {
-        context.writeCodeword(HighLevelEncoder.C40_UNLATCH);
-      }
+      context.handleEODRefactoring();
     } else if (available == 1 && rest == 1) {
       while (buffer.length() >= 3) {
         writeNextTriplet(context, buffer);
       }
-      if (context.hasMoreCharacters()) {
-        context.writeCodeword(HighLevelEncoder.C40_UNLATCH);
-      }
+      context.handleEODRefactoring();
       // else no unlatch
-      context.pos--;
+      context.data.pos--;
     } else if (rest == 0) {
       while (buffer.length() >= 3) {
         writeNextTriplet(context, buffer);
@@ -158,49 +113,103 @@ class C40Encoder implements Encoder {
     context.signalEncoderChange(HighLevelEncoder.ASCII_ENCODATION);
   }
 
-  int encodeChar(char c, StringBuilder sb) {
-    if (c == ' ') {
-      sb.append('\3');
+public int encodeChar(char c, StringBuilder sb) {
+    return encodeCharRefactoring12(c, sb);
+  }
+
+private int encodeCharRefactoring12(char c, StringBuilder sb) {
+	if (c == ' ') {
+      encodeCharRefactoring6(sb);
       return 1;
     }
     if (c >= '0' && c <= '9') {
-      sb.append((char) (c - 48 + 4));
+      encodeCharRefactoring6(c, sb);
       return 1;
     }
     if (c >= 'A' && c <= 'Z') {
-      sb.append((char) (c - 65 + 14));
+      encodeCharRefactoring5(c, sb);
       return 1;
     }
     if (c < ' ') {
-      sb.append('\0'); //Shift 1 Set
-      sb.append(c);
-      return 2;
+      encodeCharRefactoring7(c, sb);
+      return encodeCharRefactoring9();
     }
     if (c <= '/') {
-      sb.append('\1'); //Shift 2 Set
-      sb.append((char) (c - 33));
-      return 2;
+      encodeCharRefactoring9(c, sb);
+      return encodeCharRefactoring9();
     }
     if (c <= '@') {
       sb.append('\1'); //Shift 2 Set
       sb.append((char) (c - 58 + 15));
-      return 2;
+      return encodeCharRefactoring9();
     }
     if (c <= '_') {
-      sb.append('\1'); //Shift 2 Set
-      sb.append((char) (c - 91 + 22));
-      return 2;
+      encodeCharRefactoring4(c, sb);
+      return encodeCharRefactoring9();
     }
     if (c <= 127) {
-      sb.append('\2'); //Shift 3 Set
-      sb.append((char) (c - 96));
-      return 2;
+      encodeCharRefactoring3(c, sb);
+      return encodeCharRefactoring9();
     }
-    sb.append("\1\u001e"); //Shift 2, Upper Shift
+    return encodeCharRefactoring8(c, sb);
+}
+
+private int encodeCharRefactoring9() {
+	return 2;
+}
+
+private void encodeCharRefactoring9(char c, StringBuilder sb) {
+	sb.append('\1'); //Shift 2 Set
+      sb.append((char) (c - 33));
+}
+
+private int encodeCharRefactoring8(char c, StringBuilder sb) {
+	int len = encodeCharRefactoring1(c, sb);
+    return encodeCharRefactoring7(len);
+}
+
+public int encodeCharRefactoring7(int len) {
+	return len;
+}
+
+private void encodeCharRefactoring7(char c, StringBuilder sb) {
+	sb.append('\0'); //Shift 1 Set
+      sb.append(c);
+}
+
+private void encodeCharRefactoring6(StringBuilder sb) {
+	sb.append('\3');
+}
+
+private void encodeCharRefactoring6(char c, StringBuilder sb) {
+	sb.append((char) (c - 48 + 4));
+}
+
+private void encodeCharRefactoring5(char c, StringBuilder sb) {
+	sb.append((char) (c - 65 + 14));
+}
+
+private void encodeCharRefactoring4(char c, StringBuilder sb) {
+	sb.append('\1'); //Shift 2 Set
+      sb.append((char) (c - 91 + 22));
+}
+
+private void encodeCharRefactoring3(char c, StringBuilder sb) {
+	sb.append('\2'); //Shift 3 Set
+      sb.append((char) (c - 96));
+}
+
+private int encodeCharRefactoring1(char c, StringBuilder sb) {
+	int len = encodeCharRefactoring(c, sb);
+	return encodeCharRefactoring7(len);
+}
+
+private int encodeCharRefactoring(char c, StringBuilder sb) {
+	sb.append("\1\u001e"); //Shift 2, Upper Shift
     int len = 2;
     len += encodeChar((char) (c - 128), sb);
-    return len;
-  }
+	return encodeCharRefactoring7(len);
+}
 
   private static String encodeToCodewords(CharSequence sb) {
     int v = (1600 * sb.charAt(0)) + (40 * sb.charAt(1)) + sb.charAt(2) + 1;

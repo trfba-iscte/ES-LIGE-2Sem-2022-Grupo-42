@@ -31,9 +31,9 @@ final class Base256Encoder implements Encoder {
       char c = context.getCurrentChar();
       buffer.append(c);
 
-      context.pos++;
+      context.data.pos++;
 
-      int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.pos, getEncodingMode());
+      int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.data.pos, getEncodingMode());
       if (newMode != getEncodingMode()) {
         // Return to ASCII encodation, which will actually handle latch to new mode
         context.signalEncoderChange(HighLevelEncoder.ASCII_ENCODATION);

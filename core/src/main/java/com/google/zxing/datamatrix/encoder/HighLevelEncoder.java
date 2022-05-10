@@ -173,15 +173,7 @@ public final class HighLevelEncoder {
     context.setSymbolShape(shape);
     context.setSizeConstraints(minSize, maxSize);
 
-    if (msg.startsWith(MACRO_05_HEADER) && msg.endsWith(MACRO_TRAILER)) {
-      context.writeCodeword(MACRO_05);
-      context.setSkipAtEnd(2);
-      context.pos += MACRO_05_HEADER.length();
-    } else if (msg.startsWith(MACRO_06_HEADER) && msg.endsWith(MACRO_TRAILER)) {
-      context.writeCodeword(MACRO_06);
-      context.setSkipAtEnd(2);
-      context.pos += MACRO_06_HEADER.length();
-    }
+    encodeHighLevel(msg, context);
 
     int encodingMode = ASCII_ENCODATION; //Default mode
 
@@ -219,6 +211,18 @@ public final class HighLevelEncoder {
     return context.getCodewords().toString();
   }
 
+private static void encodeHighLevel(String msg, EncoderContext context) {
+	if (msg.startsWith(MACRO_05_HEADER) && msg.endsWith(MACRO_TRAILER)) {
+      context.writeCodeword(MACRO_05);
+      context.setSkipAtEnd(2);
+      context.data.pos += MACRO_05_HEADER.length();
+    } else if (msg.startsWith(MACRO_06_HEADER) && msg.endsWith(MACRO_TRAILER)) {
+      context.writeCodeword(MACRO_06);
+      context.setSkipAtEnd(2);
+      context.data.pos += MACRO_06_HEADER.length();
+    }
+}
+
   static int lookAheadTest(CharSequence msg, int startpos, int currentMode) {
     int newMode = lookAheadTestIntern(msg, startpos, currentMode);
     if (currentMode == X12_ENCODATION && newMode == X12_ENCODATION) {
@@ -243,14 +247,7 @@ public final class HighLevelEncoder {
     if (startpos >= msg.length()) {
       return currentMode;
     }
-    float[] charCounts;
-    //step J
-    if (currentMode == ASCII_ENCODATION) {
-      charCounts = new float[]{0, 1, 1, 1, 1, 1.25f};
-    } else {
-      charCounts = new float[]{1, 2, 2, 2, 2, 2.25f};
-      charCounts[currentMode] = 0;
-    }
+    float[] charCounts = lookAheadTestInternRefactoring4(currentMode);
 
     int charsProcessed = 0;
     while (true) {
@@ -265,16 +262,16 @@ public final class HighLevelEncoder {
         if (intCharCounts[ASCII_ENCODATION] == min) {
           return ASCII_ENCODATION;
         }
-        if (minCount == 1 && mins[BASE256_ENCODATION] > 0) {
+        if (lookAheadTestInternRefactoring02(mins, minCount)) {
           return BASE256_ENCODATION;
         }
-        if (minCount == 1 && mins[EDIFACT_ENCODATION] > 0) {
+        if (lookAheadTestInternRefactoring03(mins, minCount)) {
           return EDIFACT_ENCODATION;
         }
-        if (minCount == 1 && mins[TEXT_ENCODATION] > 0) {
+        if (lookAheadTestInternRefactoring05(mins, minCount)) {
           return TEXT_ENCODATION;
         }
-        if (minCount == 1 && mins[X12_ENCODATION] > 0) {
+        if (lookAheadTestInternRefactoring06(mins, minCount)) {
           return X12_ENCODATION;
         }
         return C40_ENCODATION;
@@ -284,58 +281,19 @@ public final class HighLevelEncoder {
       charsProcessed++;
 
       //step L
-      if (isDigit(c)) {
-        charCounts[ASCII_ENCODATION] += 0.5f;
-      } else if (isExtendedASCII(c)) {
-        charCounts[ASCII_ENCODATION] = (float) Math.ceil(charCounts[ASCII_ENCODATION]);
-        charCounts[ASCII_ENCODATION] += 2.0f;
-      } else {
-        charCounts[ASCII_ENCODATION] = (float) Math.ceil(charCounts[ASCII_ENCODATION]);
-        charCounts[ASCII_ENCODATION]++;
-      }
+      lookAheadTestInternRefactoring(charCounts, c);
 
       //step M
-      if (isNativeC40(c)) {
-        charCounts[C40_ENCODATION] += 2.0f / 3.0f;
-      } else if (isExtendedASCII(c)) {
-        charCounts[C40_ENCODATION] += 8.0f / 3.0f;
-      } else {
-        charCounts[C40_ENCODATION] += 4.0f / 3.0f;
-      }
+      lookAheadTestInternRefactoring5(charCounts, c);
 
       //step N
-      if (isNativeText(c)) {
-        charCounts[TEXT_ENCODATION] += 2.0f / 3.0f;
-      } else if (isExtendedASCII(c)) {
-        charCounts[TEXT_ENCODATION] += 8.0f / 3.0f;
-      } else {
-        charCounts[TEXT_ENCODATION] += 4.0f / 3.0f;
-      }
+      lookAheadTestInternRefactoring6(charCounts, c);
 
       //step O
-      if (isNativeX12(c)) {
-        charCounts[X12_ENCODATION] += 2.0f / 3.0f;
-      } else if (isExtendedASCII(c)) {
-        charCounts[X12_ENCODATION] += 13.0f / 3.0f;
-      } else {
-        charCounts[X12_ENCODATION] += 10.0f / 3.0f;
-      }
+      lookAheadTestInternRefactoring2(charCounts, c);
 
       //step P
-      if (isNativeEDIFACT(c)) {
-        charCounts[EDIFACT_ENCODATION] += 3.0f / 4.0f;
-      } else if (isExtendedASCII(c)) {
-        charCounts[EDIFACT_ENCODATION] += 17.0f / 4.0f;
-      } else {
-        charCounts[EDIFACT_ENCODATION] += 13.0f / 4.0f;
-      }
-
-      // step Q
-      if (isSpecialB256(c)) {
-        charCounts[BASE256_ENCODATION] += 4.0f;
-      } else {
-        charCounts[BASE256_ENCODATION]++;
-      }
+      lookAheadTestInternRefactoring1(charCounts, c);
 
       //step R
       if (charsProcessed >= 4) {
@@ -348,9 +306,7 @@ public final class HighLevelEncoder {
               intCharCounts[EDIFACT_ENCODATION])) {
           return ASCII_ENCODATION;
         }
-        if (intCharCounts[BASE256_ENCODATION] < intCharCounts[ASCII_ENCODATION] ||
-              intCharCounts[BASE256_ENCODATION] + 1 < min(intCharCounts[C40_ENCODATION],
-              intCharCounts[TEXT_ENCODATION], intCharCounts[X12_ENCODATION], intCharCounts[EDIFACT_ENCODATION])) {
+        if (lookAheadTestInternRefactoring08(intCharCounts)) {
           return BASE256_ENCODATION;
         }
         if (intCharCounts[EDIFACT_ENCODATION] + 1 < min(intCharCounts[BASE256_ENCODATION],
@@ -391,6 +347,105 @@ public final class HighLevelEncoder {
       }
     }
   }
+
+private static boolean lookAheadTestInternRefactoring08(int[] intCharCounts) {
+	return intCharCounts[BASE256_ENCODATION] < intCharCounts[ASCII_ENCODATION] ||
+	      intCharCounts[BASE256_ENCODATION] + 1 < min(intCharCounts[C40_ENCODATION],
+	      intCharCounts[TEXT_ENCODATION], intCharCounts[X12_ENCODATION], intCharCounts[EDIFACT_ENCODATION]);
+}
+
+private static boolean lookAheadTestInternRefactoring06(byte[] mins, int minCount) {
+	return minCount == 1 && mins[X12_ENCODATION] > 0;
+}
+
+private static boolean lookAheadTestInternRefactoring05(byte[] mins, int minCount) {
+	return minCount == 1 && mins[TEXT_ENCODATION] > 0;
+}
+
+private static boolean lookAheadTestInternRefactoring03(byte[] mins, int minCount) {
+	return minCount == 1 && mins[EDIFACT_ENCODATION] > 0;
+}
+
+private static boolean lookAheadTestInternRefactoring02(byte[] mins, int minCount) {
+	return minCount == 1 && mins[BASE256_ENCODATION] > 0;
+}
+
+private static void lookAheadTestInternRefactoring6(float[] charCounts, char c) {
+	if (isNativeText(c)) {
+        charCounts[TEXT_ENCODATION] += 2.0f / 3.0f;
+      } else if (isExtendedASCII(c)) {
+        charCounts[TEXT_ENCODATION] += 8.0f / 3.0f;
+      } else {
+        charCounts[TEXT_ENCODATION] += 4.0f / 3.0f;
+      }
+}
+
+private static void lookAheadTestInternRefactoring5(float[] charCounts, char c) {
+	if (isNativeC40(c)) {
+        charCounts[C40_ENCODATION] += 2.0f / 3.0f;
+      } else if (isExtendedASCII(c)) {
+        charCounts[C40_ENCODATION] += 8.0f / 3.0f;
+      } else {
+        charCounts[C40_ENCODATION] += 4.0f / 3.0f;
+      }
+}
+
+private static float[] lookAheadTestInternRefactoring4(int currentMode) {
+	float[] charCounts;
+    //step J
+    charCounts = lookAheadTestInternRefactoring(currentMode);
+	return charCounts;
+}
+
+private static void lookAheadTestInternRefactoring2(float[] charCounts, char c) {
+	if (isNativeX12(c)) {
+        charCounts[X12_ENCODATION] += 2.0f / 3.0f;
+      } else if (isExtendedASCII(c)) {
+        charCounts[X12_ENCODATION] += 13.0f / 3.0f;
+      } else {
+        charCounts[X12_ENCODATION] += 10.0f / 3.0f;
+      }
+}
+
+private static void lookAheadTestInternRefactoring1(float[] charCounts, char c) {
+	if (isNativeEDIFACT(c)) {
+        charCounts[EDIFACT_ENCODATION] += 3.0f / 4.0f;
+      } else if (isExtendedASCII(c)) {
+        charCounts[EDIFACT_ENCODATION] += 17.0f / 4.0f;
+      } else {
+        charCounts[EDIFACT_ENCODATION] += 13.0f / 4.0f;
+      }
+
+      // step Q
+      if (isSpecialB256(c)) {
+        charCounts[BASE256_ENCODATION] += 4.0f;
+      } else {
+        charCounts[BASE256_ENCODATION]++;
+      }
+}
+
+private static void lookAheadTestInternRefactoring(float[] charCounts, char c) {
+	if (isDigit(c)) {
+        charCounts[ASCII_ENCODATION] += 0.5f;
+      } else if (isExtendedASCII(c)) {
+        charCounts[ASCII_ENCODATION] = (float) Math.ceil(charCounts[ASCII_ENCODATION]);
+        charCounts[ASCII_ENCODATION] += 2.0f;
+      } else {
+        charCounts[ASCII_ENCODATION] = (float) Math.ceil(charCounts[ASCII_ENCODATION]);
+        charCounts[ASCII_ENCODATION]++;
+      }
+}
+
+private static float[] lookAheadTestInternRefactoring(int currentMode) {
+	float[] charCounts;
+	if (currentMode == ASCII_ENCODATION) {
+      charCounts = new float[]{0, 1, 1, 1, 1, 1.25f};
+    } else {
+      charCounts = new float[]{1, 2, 2, 2, 2, 2.25f};
+      charCounts[currentMode] = 0;
+    }
+	return charCounts;
+}
 
   private static int min(int f1, int f2, int f3, int f4, int f5) {
     return Math.min(min(f1, f2, f3, f4),f5);
