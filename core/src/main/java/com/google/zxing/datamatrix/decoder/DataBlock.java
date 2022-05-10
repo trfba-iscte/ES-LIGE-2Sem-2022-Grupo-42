@@ -58,13 +58,7 @@ final class DataBlock {
     // Now establish DataBlocks of the appropriate size and number of data codewords
     DataBlock[] result = new DataBlock[totalBlocks];
     int numResultBlocks = 0;
-    for (Version.ECB ecBlock : ecBlockArray) {
-      for (int i = 0; i < ecBlock.getCount(); i++) {
-        int numDataCodewords = ecBlock.getDataCodewords();
-        int numBlockCodewords = ecBlocks.getECCodewords() + numDataCodewords;
-        result[numResultBlocks++] = new DataBlock(numDataCodewords, new byte[numBlockCodewords]);
-      }
-    }
+    numResultBlocks = dataBlockRefactor(ecBlocks, ecBlockArray, result, numResultBlocks);
 
     // All blocks have the same amount of data, except that the last n
     // (where n may be 0) have 1 less byte. Figure out where these start.
@@ -77,11 +71,8 @@ final class DataBlock {
     // The last elements of result may be 1 element shorter for 144 matrix
     // first fill out as many elements as all of them have minus 1
     int rawCodewordsOffset = 0;
-    for (int i = 0; i < shorterBlocksNumDataCodewords; i++) {
-      for (int j = 0; j < numResultBlocks; j++) {
-        result[j].codewords[i] = rawCodewords[rawCodewordsOffset++];
-      }
-    }
+    rawCodewordsOffset = dataBlockRefactor2(rawCodewords, result, numResultBlocks, shorterBlocksNumDataCodewords,
+			rawCodewordsOffset);
 
     // Fill out the last data block in the longer ones
     boolean specialVersion = version.getVersionNumber() == 24;
@@ -92,13 +83,8 @@ final class DataBlock {
 
     // Now add in error correction blocks
     int max = result[0].codewords.length;
-    for (int i = longerBlocksNumDataCodewords; i < max; i++) {
-      for (int j = 0; j < numResultBlocks; j++) {
-        int jOffset = specialVersion ? (j + 8) % numResultBlocks : j;
-        int iOffset = specialVersion && jOffset > 7 ? i - 1 : i;
-        result[jOffset].codewords[iOffset] = rawCodewords[rawCodewordsOffset++];
-      }
-    }
+    rawCodewordsOffset = dataBlockRefactor3(rawCodewords, result, numResultBlocks, longerBlocksNumDataCodewords,
+			rawCodewordsOffset, specialVersion, max);
 
     if (rawCodewordsOffset != rawCodewords.length) {
       throw new IllegalArgumentException();
@@ -106,6 +92,40 @@ final class DataBlock {
 
     return result;
   }
+
+private static int dataBlockRefactor3(byte[] rawCodewords, DataBlock[] result, int numResultBlocks,
+		int longerBlocksNumDataCodewords, int rawCodewordsOffset, boolean specialVersion, int max) {
+	for (int i = longerBlocksNumDataCodewords; i < max; i++) {
+      for (int j = 0; j < numResultBlocks; j++) {
+        int jOffset = specialVersion ? (j + 8) % numResultBlocks : j;
+        int iOffset = specialVersion && jOffset > 7 ? i - 1 : i;
+        result[jOffset].codewords[iOffset] = rawCodewords[rawCodewordsOffset++];
+      }
+    }
+	return rawCodewordsOffset;
+}
+
+private static int dataBlockRefactor2(byte[] rawCodewords, DataBlock[] result, int numResultBlocks,
+		int shorterBlocksNumDataCodewords, int rawCodewordsOffset) {
+	for (int i = 0; i < shorterBlocksNumDataCodewords; i++) {
+      for (int j = 0; j < numResultBlocks; j++) {
+        result[j].codewords[i] = rawCodewords[rawCodewordsOffset++];
+      }
+    }
+	return rawCodewordsOffset;
+}
+
+private static int dataBlockRefactor(Version.ECBlocks ecBlocks, Version.ECB[] ecBlockArray, DataBlock[] result,
+		int numResultBlocks) {
+	for (Version.ECB ecBlock : ecBlockArray) {
+      for (int i = 0; i < ecBlock.getCount(); i++) {
+        int numDataCodewords = ecBlock.getDataCodewords();
+        int numBlockCodewords = ecBlocks.getECCodewords() + numDataCodewords;
+        result[numResultBlocks++] = new DataBlock(numDataCodewords, new byte[numBlockCodewords]);
+      }
+    }
+	return numResultBlocks;
+}
 
   int getNumDataCodewords() {
     return numDataCodewords;

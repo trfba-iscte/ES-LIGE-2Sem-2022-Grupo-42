@@ -231,41 +231,77 @@ final class GenericGFPoly {
     StringBuilder result = new StringBuilder(8 * getDegree());
     for (int degree = getDegree(); degree >= 0; degree--) {
       int coefficient = getCoefficient(degree);
-      if (coefficient != 0) {
-        if (coefficient < 0) {
-          if (degree == getDegree()) {
-            result.append("-");
-          } else {
-            result.append(" - ");
-          }
-          coefficient = -coefficient;
-        } else {
-          if (result.length() > 0) {
-            result.append(" + ");
-          }
-        }
-        if (degree == 0 || coefficient != 1) {
-          int alphaPower = field.log(coefficient);
-          if (alphaPower == 0) {
-            result.append('1');
-          } else if (alphaPower == 1) {
-            result.append('a');
-          } else {
-            result.append("a^");
-            result.append(alphaPower);
-          }
-        }
-        if (degree != 0) {
-          if (degree == 1) {
-            result.append('x');
-          } else {
-            result.append("x^");
-            result.append(degree);
-          }
-        }
-      }
+      genericGFProlyRefactor(result, degree, coefficient);
     }
     return result.toString();
   }
+
+private void genericGFProlyRefactor(StringBuilder result, int degree, int coefficient) {
+	if (coefficient != 0) {
+        coefficient = genericGFProlyRefactor2(result, degree, coefficient);
+        genericGFProlyRefactor3(result, degree, coefficient);
+        genericGFProlyRefactor4(result, degree);
+      }
+}
+
+private void genericGFProlyRefactor4(StringBuilder result, int degree) {
+	if (degree != 0) {
+	  if (degree == 1) {
+	    result.append('x');
+	  } else {
+	    result.append("x^");
+	    result.append(degree);
+	  }
+	}
+}
+
+private void genericGFProlyRefactor3(StringBuilder result, int degree, int coefficient) {
+	if (degree == 0 || coefficient != 1) {
+	  int alphaPower = field.log(coefficient);
+	  if (alphaPower == 0) {
+	    result.append('1');
+	  } else if (alphaPower == 1) {
+	    result.append('a');
+	  } else {
+	    result.append("a^");
+	    result.append(alphaPower);
+	  }
+	}
+}
+
+private int genericGFProlyRefactor2(StringBuilder result, int degree, int coefficient) {
+	if (coefficient < 0) {
+	  if (degree == getDegree()) {
+	    result.append("-");
+	  } else {
+	    result.append(" - ");
+	  }
+	  coefficient = -coefficient;
+	} else {
+	  if (result.length() > 0) {
+	    result.append(" + ");
+	  }
+	}
+	return coefficient;
+}
+
+public int[] findErrorLocations(GenericGF field) throws ReedSolomonException {
+	int numErrors = getDegree();
+	if (numErrors == 1) {
+		return new int[] { getCoefficient(1) };
+	}
+	int[] result = new int[numErrors];
+	int e = 0;
+	for (int i = 1; i < field.getSize() && e < numErrors; i++) {
+		if (evaluateAt(i) == 0) {
+			result[e] = field.inverse(i);
+			e++;
+		}
+	}
+	if (e != numErrors) {
+		throw new ReedSolomonException("Error locator degree does not match number of roots");
+	}
+	return result;
+}
 
 }
