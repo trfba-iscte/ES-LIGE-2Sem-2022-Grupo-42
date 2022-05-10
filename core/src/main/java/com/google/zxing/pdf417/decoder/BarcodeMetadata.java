@@ -55,4 +55,44 @@ final class BarcodeMetadata {
     return rowCountLowerPart;
   }
 
+public void removeIncorrectCodewordsRefactoring(Codeword[] codewords, int codewordRow, int rowIndicatorValue,
+		int codewordRowNumber) {
+	switch (codewordRowNumber % 3) {
+	case 0:
+		if (rowIndicatorValue * 3 + 1 != getRowCountUpperPart()) {
+			codewords[codewordRow] = null;
+		}
+		break;
+	case 1:
+		if (rowIndicatorValue / 3 != getErrorCorrectionLevel() || rowIndicatorValue % 3 != getRowCountLowerPart()) {
+			codewords[codewordRow] = null;
+		}
+		break;
+	case 2:
+		if (rowIndicatorValue + 1 != getColumnCount()) {
+			codewords[codewordRow] = null;
+		}
+		break;
+	}
+}
+
+public void removeIncorrectCodewords(Codeword[] codewords, boolean isLeft) {
+	for (int codewordRow = 0; codewordRow < codewords.length; codewordRow++) {
+		Codeword codeword = codewords[codewordRow];
+		if (codewords[codewordRow] == null) {
+			continue;
+		}
+		int rowIndicatorValue = codeword.getValue() % 30;
+		int codewordRowNumber = codeword.getRowNumber();
+		if (codewordRowNumber > getRowCount()) {
+			codewords[codewordRow] = null;
+			continue;
+		}
+		if (!isLeft) {
+			codewordRowNumber += 2;
+		}
+		removeIncorrectCodewordsRefactoring(codewords, codewordRow, rowIndicatorValue, codewordRowNumber);
+	}
+}
+
 }
