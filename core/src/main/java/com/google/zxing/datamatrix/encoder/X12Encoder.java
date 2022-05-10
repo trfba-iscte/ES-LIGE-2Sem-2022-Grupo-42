@@ -29,7 +29,7 @@ final class X12Encoder extends C40Encoder {
     StringBuilder buffer = new StringBuilder();
     while (context.hasMoreCharacters()) {
       char c = context.getCurrentChar();
-      context.pos++;
+      context.data.pos++;
 
       encodeChar(c, buffer);
 
@@ -37,7 +37,7 @@ final class X12Encoder extends C40Encoder {
       if ((count % 3) == 0) {
         writeNextTriplet(context, buffer);
 
-        int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.pos, getEncodingMode());
+        int newMode = HighLevelEncoder.lookAheadTest(context.getMessage(), context.data.pos, getEncodingMode());
         if (newMode != getEncodingMode()) {
           // Return to ASCII encodation, which will actually handle latch to new mode
           context.signalEncoderChange(HighLevelEncoder.ASCII_ENCODATION);
@@ -48,7 +48,7 @@ final class X12Encoder extends C40Encoder {
     handleEOD(context, buffer);
   }
 
-  @Override
+  public @Override
   int encodeChar(char c, StringBuilder sb) {
     switch (c) {
       case '\r':
@@ -76,12 +76,12 @@ final class X12Encoder extends C40Encoder {
     return 1;
   }
 
-  @Override
+  public @Override
   void handleEOD(EncoderContext context, StringBuilder buffer) {
     context.updateSymbolInfo();
     int available = context.getSymbolInfo().getDataCapacity() - context.getCodewordCount();
     int count = buffer.length();
-    context.pos -= count;
+    context.data.pos -= count;
     if (context.getRemainingCharacters() > 1 || available > 1 ||
         context.getRemainingCharacters() != available) {
       context.writeCodeword(HighLevelEncoder.X12_UNLATCH);

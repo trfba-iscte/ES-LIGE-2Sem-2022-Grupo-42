@@ -207,10 +207,14 @@ final class DecodedBitStreamParser {
         set = lastset;
       }
     }
-    while (sb.length() > 0 && sb.charAt(sb.length() - 1) == PAD) {
+    while (getMessageRefactoring(sb)) {
       sb.setLength(sb.length() - 1);
     }
     return sb.toString();
   }
+
+private static boolean getMessageRefactoring(StringBuilder sb) {
+	return sb.length() > 0 && sb.charAt(sb.length() - 1) == PAD;
+}
 
 }

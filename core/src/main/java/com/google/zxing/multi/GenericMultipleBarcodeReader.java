@@ -98,7 +98,7 @@ public final class GenericMultipleBarcodeReader implements MultipleBarcodeReader
       results.add(translateResultPoints(result, xOffset, yOffset));
     }
     ResultPoint[] resultPoints = result.getResultPoints();
-    if (resultPoints == null || resultPoints.length == 0) {
+    if (doDecodeMultipleRefactoring(resultPoints)) {
       return;
     }
     int width = image.getWidth();
@@ -156,6 +156,10 @@ public final class GenericMultipleBarcodeReader implements MultipleBarcodeReader
                        currentDepth + 1);
     }
   }
+
+private boolean doDecodeMultipleRefactoring(ResultPoint[] resultPoints) {
+	return resultPoints == null || resultPoints.length == 0;
+}
 
   private static Result translateResultPoints(Result result, int xOffset, int yOffset) {
     ResultPoint[] oldResultPoints = result.getResultPoints();

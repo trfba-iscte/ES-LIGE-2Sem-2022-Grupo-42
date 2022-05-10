@@ -23,12 +23,9 @@ import java.util.Arrays;
  */
 public class DefaultPlacement {
 
-  private final CharSequence codewords;
-  private final int numrows;
-  private final int numcols;
-  private final byte[] bits;
+  private DefaultPlacementData1 data = new DefaultPlacementData1(new DefaultPlacementDataRefactoring1(new DefaultPlacementDataRefactoring()));
 
-  /**
+/**
    * Main constructor
    *
    * @param codewords the codewords to place
@@ -36,35 +33,35 @@ public class DefaultPlacement {
    * @param numrows   the number of rows
    */
   public DefaultPlacement(CharSequence codewords, int numcols, int numrows) {
-    this.codewords = codewords;
-    this.numcols = numcols;
-    this.numrows = numrows;
-    this.bits = new byte[numcols * numrows];
-    Arrays.fill(this.bits, (byte) -1); //Initialize with "not set" value
+    this.data.data.data.codewords = codewords;
+    this.data.data.data.numcols = numcols;
+    this.data.data.data.numrows = numrows;
+    this.data.data.data.bits = new byte[numcols * numrows];
+    Arrays.fill(this.data.data.data.bits, (byte) -1); //Initialize with "not set" value
   }
 
   final int getNumrows() {
-    return numrows;
+    return data.data.data.numrows;
   }
 
   final int getNumcols() {
-    return numcols;
+    return data.data.data.numcols;
   }
 
   final byte[] getBits() {
-    return bits;
+    return data.data.data.bits;
   }
 
   public final boolean getBit(int col, int row) {
-    return bits[row * numcols + col] == 1;
+    return data.data.data.bits[row * data.data.data.numcols + col] == 1;
   }
 
   private void setBit(int col, int row, boolean bit) {
-    bits[row * numcols + col] = (byte) (bit ? 1 : 0);
+    data.data.data.bits[row * data.data.data.numcols + col] = (byte) (bit ? 1 : 0);
   }
 
   private boolean noBit(int col, int row) {
-    return bits[row * numcols + col] < 0;
+    return data.data.data.bits[row * data.data.data.numcols + col] < 0;
   }
 
   public final void place() {
@@ -74,61 +71,91 @@ public class DefaultPlacement {
 
     do {
       // repeatedly first check for one of the special corner cases, then...
-      if ((row == numrows) && (col == 0)) {
-        corner1(pos++);
-      }
-      if ((row == numrows - 2) && (col == 0) && ((numcols % 4) != 0)) {
-        corner2(pos++);
-      }
-      if ((row == numrows - 2) && (col == 0) && (numcols % 8 == 4)) {
-        corner3(pos++);
-      }
-      if ((row == numrows + 4) && (col == 2) && ((numcols % 8) == 0)) {
-        corner4(pos++);
-      }
+      pos = placeRefactoring(pos, row, col);
+      pos = placeRefactoring2(pos, row, col);
+      pos = replaceRefactoring3(pos, row, col);
+      pos = replaceRefactoring4(pos, row, col);
       // sweep upward diagonally, inserting successive characters...
       do {
-        if ((row < numrows) && (col >= 0) && noBit(col, row)) {
-          utah(row, col, pos++);
-        }
+        pos = replaceRefactoring5(pos, row, col);
         row -= 2;
         col += 2;
-      } while (row >= 0 && (col < numcols));
+      } while (row >= 0 && (col < data.data.data.numcols));
       row++;
       col += 3;
 
       // and then sweep downward diagonally, inserting successive characters, ...
       do {
-        if ((row >= 0) && (col < numcols) && noBit(col, row)) {
-          utah(row, col, pos++);
-        }
+        pos = replaceRefactoring6(pos, row, col);
         row += 2;
         col -= 2;
-      } while ((row < numrows) && (col >= 0));
+      } while ((row < data.data.data.numrows) && (col >= 0));
       row += 3;
       col++;
 
       // ...until the entire array is scanned
-    } while ((row < numrows) || (col < numcols));
+    } while ((row < data.data.data.numrows) || (col < data.data.data.numcols));
 
     // Lastly, if the lower right-hand corner is untouched, fill in fixed pattern
-    if (noBit(numcols - 1, numrows - 1)) {
-      setBit(numcols - 1, numrows - 1, true);
-      setBit(numcols - 2, numrows - 2, true);
+    if (noBit(data.data.data.numcols - 1, data.data.data.numrows - 1)) {
+      setBit(data.data.data.numcols - 1, data.data.data.numrows - 1, true);
+      setBit(data.data.data.numcols - 2, data.data.data.numrows - 2, true);
     }
   }
 
+private int replaceRefactoring6(int pos, int row, int col) {
+	if ((row >= 0) && (col < data.data.data.numcols) && noBit(col, row)) {
+	  utah(row, col, pos++);
+	}
+	return pos;
+}
+
+private int replaceRefactoring5(int pos, int row, int col) {
+	if ((row < data.data.data.numrows) && (col >= 0) && noBit(col, row)) {
+	  utah(row, col, pos++);
+	}
+	return pos;
+}
+
+private int replaceRefactoring4(int pos, int row, int col) {
+	if ((row == data.data.data.numrows + 4) && (col == 2) && ((data.data.data.numcols % 8) == 0)) {
+        corner4(pos++);
+      }
+	return pos;
+}
+
+private int replaceRefactoring3(int pos, int row, int col) {
+	if ((row == data.data.data.numrows - 2) && (col == 0) && (data.data.data.numcols % 8 == 4)) {
+        corner3(pos++);
+      }
+	return pos;
+}
+
+private int placeRefactoring2(int pos, int row, int col) {
+	if ((row == data.data.data.numrows - 2) && (col == 0) && ((data.data.data.numcols % 4) != 0)) {
+        corner2(pos++);
+      }
+	return pos;
+}
+
+private int placeRefactoring(int pos, int row, int col) {
+	if ((row == data.data.data.numrows) && (col == 0)) {
+        corner1(pos++);
+      }
+	return pos;
+}
+
   private void module(int row, int col, int pos, int bit) {
     if (row < 0) {
-      row += numrows;
-      col += 4 - ((numrows + 4) % 8);
+      row += data.data.data.numrows;
+      col += 4 - ((data.data.data.numrows + 4) % 8);
     }
     if (col < 0) {
-      col += numcols;
-      row += 4 - ((numcols + 4) % 8);
+      col += data.data.data.numcols;
+      row += 4 - ((data.data.data.numcols + 4) % 8);
     }
     // Note the conversion:
-    int v = codewords.charAt(pos);
+    int v = data.data.data.codewords.charAt(pos);
     v &= 1 << (8 - bit);
     setBit(col, row, v != 0);
   }
@@ -152,47 +179,47 @@ public class DefaultPlacement {
   }
 
   private void corner1(int pos) {
-    module(numrows - 1, 0, pos, 1);
-    module(numrows - 1, 1, pos, 2);
-    module(numrows - 1, 2, pos, 3);
-    module(0, numcols - 2, pos, 4);
-    module(0, numcols - 1, pos, 5);
-    module(1, numcols - 1, pos, 6);
-    module(2, numcols - 1, pos, 7);
-    module(3, numcols - 1, pos, 8);
+    module(data.data.data.numrows - 1, 0, pos, 1);
+    module(data.data.data.numrows - 1, 1, pos, 2);
+    module(data.data.data.numrows - 1, 2, pos, 3);
+    module(0, data.data.data.numcols - 2, pos, 4);
+    module(0, data.data.data.numcols - 1, pos, 5);
+    module(1, data.data.data.numcols - 1, pos, 6);
+    module(2, data.data.data.numcols - 1, pos, 7);
+    module(3, data.data.data.numcols - 1, pos, 8);
   }
 
   private void corner2(int pos) {
-    module(numrows - 3, 0, pos, 1);
-    module(numrows - 2, 0, pos, 2);
-    module(numrows - 1, 0, pos, 3);
-    module(0, numcols - 4, pos, 4);
-    module(0, numcols - 3, pos, 5);
-    module(0, numcols - 2, pos, 6);
-    module(0, numcols - 1, pos, 7);
-    module(1, numcols - 1, pos, 8);
+    module(data.data.data.numrows - 3, 0, pos, 1);
+    module(data.data.data.numrows - 2, 0, pos, 2);
+    module(data.data.data.numrows - 1, 0, pos, 3);
+    module(0, data.data.data.numcols - 4, pos, 4);
+    module(0, data.data.data.numcols - 3, pos, 5);
+    module(0, data.data.data.numcols - 2, pos, 6);
+    module(0, data.data.data.numcols - 1, pos, 7);
+    module(1, data.data.data.numcols - 1, pos, 8);
   }
 
   private void corner3(int pos) {
-    module(numrows - 3, 0, pos, 1);
-    module(numrows - 2, 0, pos, 2);
-    module(numrows - 1, 0, pos, 3);
-    module(0, numcols - 2, pos, 4);
-    module(0, numcols - 1, pos, 5);
-    module(1, numcols - 1, pos, 6);
-    module(2, numcols - 1, pos, 7);
-    module(3, numcols - 1, pos, 8);
+    module(data.data.data.numrows - 3, 0, pos, 1);
+    module(data.data.data.numrows - 2, 0, pos, 2);
+    module(data.data.data.numrows - 1, 0, pos, 3);
+    module(0, data.data.data.numcols - 2, pos, 4);
+    module(0, data.data.data.numcols - 1, pos, 5);
+    module(1, data.data.data.numcols - 1, pos, 6);
+    module(2, data.data.data.numcols - 1, pos, 7);
+    module(3, data.data.data.numcols - 1, pos, 8);
   }
 
   private void corner4(int pos) {
-    module(numrows - 1, 0, pos, 1);
-    module(numrows - 1, numcols - 1, pos, 2);
-    module(0, numcols - 3, pos, 3);
-    module(0, numcols - 2, pos, 4);
-    module(0, numcols - 1, pos, 5);
-    module(1, numcols - 3, pos, 6);
-    module(1, numcols - 2, pos, 7);
-    module(1, numcols - 1, pos, 8);
+    module(data.data.data.numrows - 1, 0, pos, 1);
+    module(data.data.data.numrows - 1, data.data.data.numcols - 1, pos, 2);
+    module(0, data.data.data.numcols - 3, pos, 3);
+    module(0, data.data.data.numcols - 2, pos, 4);
+    module(0, data.data.data.numcols - 1, pos, 5);
+    module(1, data.data.data.numcols - 3, pos, 6);
+    module(1, data.data.data.numcols - 2, pos, 7);
+    module(1, data.data.data.numcols - 1, pos, 8);
   }
 
 }
