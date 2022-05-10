@@ -409,7 +409,7 @@ public Map<DecodeHintType, ?> OneDReader2(Map<DecodeHintType, ?> hints, int atte
 
 public void UPCEANReader6(int end, int quietEnd) throws NotFoundException {
 	if (quietEnd >= getSize() || !isRange(end, quietEnd, false)) {
-		throw NotFoundException.getNotFoundInstance();
+		throw NotFoundException.getNotFoundInstance();}
 	}
 
 public boolean isStillNumeric(int pos) {
