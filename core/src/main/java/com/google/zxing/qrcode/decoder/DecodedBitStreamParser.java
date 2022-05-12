@@ -1,5 +1,4 @@
-/*
- * Copyright 2007 ZXing authors
+/* Copyright 2007 ZXing authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,9 +87,7 @@ final class DecodedBitStreamParser {
             fc1InEffect = true;
             break;
           case STRUCTURED_APPEND:
-            if (bits.available() < 16) {
-              throw FormatException.getFormatInstance();
-            }
+            decodeRefactoring1(bits);
             // sequence number and parity is added later to the result metadata
             // Read next 8 bits (symbol sequence #) and 8 bits (parity data), then continue
             symbolSequence = bits.readBits(8);
@@ -100,18 +97,14 @@ final class DecodedBitStreamParser {
             // Count doesn't apply to ECI
             int value = parseECIValue(bits);
             currentCharacterSetECI = CharacterSetECI.getCharacterSetECIByValue(value);
-            if (currentCharacterSetECI == null) {
-              throw FormatException.getFormatInstance();
-            }
+            decodeRefactoring2(currentCharacterSetECI);
             break;
           case HANZI:
             // First handle Hanzi mode which does not start with character count
             // Chinese mode contains a sub set indicator right after mode indicator
             int subset = bits.readBits(4);
             int countHanzi = bits.readBits(mode.getCharacterCountBits(version));
-            if (subset == GB2312_SUBSET) {
-              decodeHanziSegment(bits, result, countHanzi);
-            }
+            decodeRefactoring3(bits, result, subset, countHanzi);
             break;
           default:
             // "Normal" QR code modes:
@@ -168,6 +161,25 @@ final class DecodedBitStreamParser {
                              parityData,
                              symbologyModifier);
   }
+
+private static void decodeRefactoring3(BitSource bits, StringBuilder result, int subset, int countHanzi)
+		throws FormatException {
+	if (subset == GB2312_SUBSET) {
+	  decodeHanziSegment(bits, result, countHanzi);
+	}
+}
+
+private static void decodeRefactoring2(CharacterSetECI currentCharacterSetECI) throws FormatException {
+	if (currentCharacterSetECI == null) {
+	  throw FormatException.getFormatInstance();
+	}
+}
+
+private static void decodeRefactoring1(BitSource bits) throws FormatException {
+	if (bits.available() < 16) {
+	  throw FormatException.getFormatInstance();
+	}
+}
 
   /**
    * See specification GBT 18284-2000

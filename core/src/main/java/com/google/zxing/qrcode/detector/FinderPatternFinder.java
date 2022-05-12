@@ -86,9 +86,7 @@ public class FinderPatternFinder {
     // number of pixels the center could be, so skip this often. When trying harder, look for all
     // QR versions regardless of how dense they are.
     int iSkip = (3 * maxI) / (4 * MAX_MODULES);
-    if (iSkip < MIN_SKIP || tryHarder) {
-      iSkip = MIN_SKIP;
-    }
+    iSkip = findRefactoring1(tryHarder, iSkip);
 
     boolean done = false;
     int[] stateCount = new int[5];
@@ -99,14 +97,12 @@ public class FinderPatternFinder {
       for (int j = 0; j < maxJ; j++) {
         if (image.get(j, i)) {
           // Black pixel
-          if ((currentState & 1) == 1) { // Counting white pixels
-            currentState++;
-          }
+          currentState = findRefactoring2(currentState);
           stateCount[currentState]++;
         } else { // White pixel
           if ((currentState & 1) == 0) { // Counting black pixels
             if (currentState == 4) { // A winner?
-              if (foundPatternCross(stateCount)) { // Yes
+              if (FinderPatternFinderRefactoring.foundPatternCross(stateCount)) { // Yes
                 boolean confirmed = handlePossibleCenter(stateCount, i, j);
                 if (confirmed) {
                   // Start examining every other line. Checking each line turned out to be too
@@ -149,14 +145,11 @@ public class FinderPatternFinder {
           }
         }
       }
-      if (foundPatternCross(stateCount)) {
+      if (FinderPatternFinderRefactoring.foundPatternCross(stateCount)) {
         boolean confirmed = handlePossibleCenter(stateCount, i, maxJ);
         if (confirmed) {
           iSkip = stateCount[0];
-          if (hasSkipped) {
-            // Found a third one
-            done = haveMultiplyConfirmedCenters();
-          }
+          done = findRefactoring2(done);
         }
       }
     }
@@ -167,68 +160,34 @@ public class FinderPatternFinder {
     return new FinderPatternInfo(patternInfo);
   }
 
+private boolean findRefactoring2(boolean done) {
+	if (hasSkipped) {
+	    // Found a third one
+	    done = haveMultiplyConfirmedCenters();
+	  }
+	return done;
+}
+
+private int findRefactoring2(int currentState) {
+	if ((currentState & 1) == 1) { // Counting white pixels
+	    currentState++;
+	  }
+	return currentState;
+}
+
+private int findRefactoring1(boolean tryHarder, int iSkip) {
+	if (iSkip < MIN_SKIP || tryHarder) {
+      iSkip = MIN_SKIP;
+    }
+	return iSkip;
+}
+
   /**
    * Given a count of black/white/black/white/black pixels just seen and an end position,
    * figures the location of the center of this run.
    */
   private static float centerFromEnd(int[] stateCount, int end) {
     return (end - stateCount[4] - stateCount[3]) - stateCount[2] / 2.0f;
-  }
-
-  /**
-   * @param stateCount count of black/white/black/white/black pixels just read
-   * @return true iff the proportions of the counts is close enough to the 1/1/3/1/1 ratios
-   *         used by finder patterns to be considered a match
-   */
-  protected static boolean foundPatternCross(int[] stateCount) {
-    int totalModuleSize = 0;
-    for (int i = 0; i < 5; i++) {
-      int count = stateCount[i];
-      if (count == 0) {
-        return false;
-      }
-      totalModuleSize += count;
-    }
-    if (totalModuleSize < 7) {
-      return false;
-    }
-    float moduleSize = totalModuleSize / 7.0f;
-    float maxVariance = moduleSize / 2.0f;
-    // Allow less than 50% variance from 1-1-3-1-1 proportions
-    return
-        Math.abs(moduleSize - stateCount[0]) < maxVariance &&
-        Math.abs(moduleSize - stateCount[1]) < maxVariance &&
-        Math.abs(3.0f * moduleSize - stateCount[2]) < 3 * maxVariance &&
-        Math.abs(moduleSize - stateCount[3]) < maxVariance &&
-        Math.abs(moduleSize - stateCount[4]) < maxVariance;
-  }
-
-  /**
-   * @param stateCount count of black/white/black/white/black pixels just read
-   * @return true iff the proportions of the counts is close enough to the 1/1/3/1/1 ratios
-   *         used by finder patterns to be considered a match
-   */
-  protected static boolean foundPatternDiagonal(int[] stateCount) {
-    int totalModuleSize = 0;
-    for (int i = 0; i < 5; i++) {
-      int count = stateCount[i];
-      if (count == 0) {
-        return false;
-      }
-      totalModuleSize += count;
-    }
-    if (totalModuleSize < 7) {
-      return false;
-    }
-    float moduleSize = totalModuleSize / 7.0f;
-    float maxVariance = moduleSize / 1.333f;
-    // Allow less than 75% variance from 1-1-3-1-1 proportions
-    return
-            Math.abs(moduleSize - stateCount[0]) < maxVariance &&
-                    Math.abs(moduleSize - stateCount[1]) < maxVariance &&
-                    Math.abs(3.0f * moduleSize - stateCount[2]) < 3 * maxVariance &&
-                    Math.abs(moduleSize - stateCount[3]) < maxVariance &&
-                    Math.abs(moduleSize - stateCount[4]) < maxVariance;
   }
 
   private int[] getCrossCheckStateCount() {
@@ -324,7 +283,7 @@ public class FinderPatternFinder {
       return false;
     }
 
-    return foundPatternDiagonal(stateCount);
+    return FinderPatternFinderRefactoring.foundPatternDiagonal(stateCount);
   }
 
   /**
@@ -347,49 +306,31 @@ public class FinderPatternFinder {
 
     // Start counting up from center
     int i = startI;
-    while (i >= 0 && image.get(centerJ, i)) {
-      stateCount[2]++;
-      i--;
-    }
+    i = crossCheckVerticalRefactoring1(centerJ, image, stateCount, i);
     if (i < 0) {
       return Float.NaN;
     }
-    while (i >= 0 && !image.get(centerJ, i) && stateCount[1] <= maxCount) {
-      stateCount[1]++;
-      i--;
-    }
+    i = crossCheckVerticalRefactoring2(centerJ, maxCount, image, stateCount, i);
     // If already too many modules in this state or ran off the edge:
     if (i < 0 || stateCount[1] > maxCount) {
       return Float.NaN;
     }
-    while (i >= 0 && image.get(centerJ, i) && stateCount[0] <= maxCount) {
-      stateCount[0]++;
-      i--;
-    }
+    crossCheckVerticalRefactoring3(centerJ, maxCount, image, stateCount, i);
     if (stateCount[0] > maxCount) {
       return Float.NaN;
     }
 
     // Now also count down from center
     i = startI + 1;
-    while (i < maxI && image.get(centerJ, i)) {
-      stateCount[2]++;
-      i++;
-    }
+    i = crossCheckVerticalRefactoring4(centerJ, image, maxI, stateCount, i);
     if (i == maxI) {
       return Float.NaN;
     }
-    while (i < maxI && !image.get(centerJ, i) && stateCount[3] < maxCount) {
-      stateCount[3]++;
-      i++;
-    }
+    i = crossCheckVerticalRefactoring5(centerJ, maxCount, image, maxI, stateCount, i);
     if (i == maxI || stateCount[3] >= maxCount) {
       return Float.NaN;
     }
-    while (i < maxI && image.get(centerJ, i) && stateCount[4] < maxCount) {
-      stateCount[4]++;
-      i++;
-    }
+    i = crossCheckVerticalRefactoring6(centerJ, maxCount, image, maxI, stateCount, i);
     if (stateCount[4] >= maxCount) {
       return Float.NaN;
     }
@@ -402,8 +343,63 @@ public class FinderPatternFinder {
       return Float.NaN;
     }
 
-    return foundPatternCross(stateCount) ? centerFromEnd(stateCount, i) : Float.NaN;
+    return FinderPatternFinderRefactoring.foundPatternCross(stateCount) ? centerFromEnd(stateCount, i) : Float.NaN;
   }
+
+private int crossCheckVerticalRefactoring6(int centerJ, int maxCount, BitMatrix image, int maxI, int[] stateCount,
+		int i) {
+	i = crossCheckVerticalRefactoring7(centerJ, maxCount, image, maxI, stateCount, i);
+	return i;
+}
+
+private int crossCheckVerticalRefactoring7(int centerJ, int maxCount, BitMatrix image, int maxI, int[] stateCount,
+		int i) {
+	while (i < maxI && image.get(centerJ, i) && stateCount[4] < maxCount) {
+      stateCount[4]++;
+      i++;
+    }
+	return i;
+}
+
+private int crossCheckVerticalRefactoring5(int centerJ, int maxCount, BitMatrix image, int maxI, int[] stateCount,
+		int i) {
+	while (i < maxI && !image.get(centerJ, i) && stateCount[3] < maxCount) {
+      stateCount[3]++;
+      i++;
+    }
+	return i;
+}
+
+private int crossCheckVerticalRefactoring4(int centerJ, BitMatrix image, int maxI, int[] stateCount, int i) {
+	while (i < maxI && image.get(centerJ, i)) {
+      stateCount[2]++;
+      i++;
+    }
+	return i;
+}
+
+private void crossCheckVerticalRefactoring3(int centerJ, int maxCount, BitMatrix image, int[] stateCount, int i) {
+	while (i >= 0 && image.get(centerJ, i) && stateCount[0] <= maxCount) {
+      stateCount[0]++;
+      i--;
+    }
+}
+
+private int crossCheckVerticalRefactoring2(int centerJ, int maxCount, BitMatrix image, int[] stateCount, int i) {
+	while (i >= 0 && !image.get(centerJ, i) && stateCount[1] <= maxCount) {
+      stateCount[1]++;
+      i--;
+    }
+	return i;
+}
+
+private int crossCheckVerticalRefactoring1(int centerJ, BitMatrix image, int[] stateCount, int i) {
+	while (i >= 0 && image.get(centerJ, i)) {
+      stateCount[2]++;
+      i--;
+    }
+	return i;
+}
 
   /**
    * <p>Like {@link #crossCheckVertical(int, int, int, int)}, and in fact is basically identical,
@@ -418,47 +414,29 @@ public class FinderPatternFinder {
     int[] stateCount = getCrossCheckStateCount();
 
     int j = startJ;
-    while (j >= 0 && image.get(j, centerI)) {
-      stateCount[2]++;
-      j--;
-    }
+    j = crossCheckHorizontalRefactoring1(centerI, image, stateCount, j);
     if (j < 0) {
       return Float.NaN;
     }
-    while (j >= 0 && !image.get(j, centerI) && stateCount[1] <= maxCount) {
-      stateCount[1]++;
-      j--;
-    }
+    j = crossCheckHorizontalRefactoring2(centerI, maxCount, image, stateCount, j);
     if (j < 0 || stateCount[1] > maxCount) {
       return Float.NaN;
     }
-    while (j >= 0 && image.get(j, centerI) && stateCount[0] <= maxCount) {
-      stateCount[0]++;
-      j--;
-    }
+    crossCheckHorizontalRefactoring3(centerI, maxCount, image, stateCount, j);
     if (stateCount[0] > maxCount) {
       return Float.NaN;
     }
 
     j = startJ + 1;
-    while (j < maxJ && image.get(j, centerI)) {
-      stateCount[2]++;
-      j++;
-    }
+    j = crossCheckHorizontalRefactoring4(centerI, image, maxJ, stateCount, j);
     if (j == maxJ) {
       return Float.NaN;
     }
-    while (j < maxJ && !image.get(j, centerI) && stateCount[3] < maxCount) {
-      stateCount[3]++;
-      j++;
-    }
+    j = crossCheckHorizontalRefactoring5(centerI, maxCount, image, maxJ, stateCount, j);
     if (j == maxJ || stateCount[3] >= maxCount) {
       return Float.NaN;
     }
-    while (j < maxJ && image.get(j, centerI) && stateCount[4] < maxCount) {
-      stateCount[4]++;
-      j++;
-    }
+    j = crossCheckHorizontalRefactoring6(centerI, maxCount, image, maxJ, stateCount, j);
     if (stateCount[4] >= maxCount) {
       return Float.NaN;
     }
@@ -471,8 +449,57 @@ public class FinderPatternFinder {
       return Float.NaN;
     }
 
-    return foundPatternCross(stateCount) ? centerFromEnd(stateCount, j) : Float.NaN;
+    return FinderPatternFinderRefactoring.foundPatternCross(stateCount) ? centerFromEnd(stateCount, j) : Float.NaN;
   }
+
+private int crossCheckHorizontalRefactoring6(int centerI, int maxCount, BitMatrix image, int maxJ, int[] stateCount,
+		int j) {
+	while (j < maxJ && image.get(j, centerI) && stateCount[4] < maxCount) {
+      stateCount[4]++;
+      j++;
+    }
+	return j;
+}
+
+private int crossCheckHorizontalRefactoring5(int centerI, int maxCount, BitMatrix image, int maxJ, int[] stateCount,
+		int j) {
+	while (j < maxJ && !image.get(j, centerI) && stateCount[3] < maxCount) {
+      stateCount[3]++;
+      j++;
+    }
+	return j;
+}
+
+private int crossCheckHorizontalRefactoring4(int centerI, BitMatrix image, int maxJ, int[] stateCount, int j) {
+	while (j < maxJ && image.get(j, centerI)) {
+      stateCount[2]++;
+      j++;
+    }
+	return j;
+}
+
+private void crossCheckHorizontalRefactoring3(int centerI, int maxCount, BitMatrix image, int[] stateCount, int j) {
+	while (j >= 0 && image.get(j, centerI) && stateCount[0] <= maxCount) {
+      stateCount[0]++;
+      j--;
+    }
+}
+
+private int crossCheckHorizontalRefactoring2(int centerI, int maxCount, BitMatrix image, int[] stateCount, int j) {
+	while (j >= 0 && !image.get(j, centerI) && stateCount[1] <= maxCount) {
+      stateCount[1]++;
+      j--;
+    }
+	return j;
+}
+
+private int crossCheckHorizontalRefactoring1(int centerI, BitMatrix image, int[] stateCount, int j) {
+	while (j >= 0 && image.get(j, centerI)) {
+      stateCount[2]++;
+      j--;
+    }
+	return j;
+}
 
   /**
    * @param stateCount reading state module counts from horizontal scan
@@ -616,10 +643,7 @@ public class FinderPatternFinder {
   private FinderPattern[] selectBestPatterns() throws NotFoundException {
 
     int startSize = possibleCenters.size();
-    if (startSize < 3) {
-      // Couldn't find enough finder patterns
-      throw NotFoundException.getNotFoundInstance();
-    }
+    selectBestPatternsRefactoring1(startSize);
 
     possibleCenters.sort(moduleComparator);
 
@@ -630,7 +654,19 @@ public class FinderPatternFinder {
       FinderPattern fpi = possibleCenters.get(i);
       float minModuleSize = fpi.getEstimatedModuleSize();
 
-      for (int j = i + 1; j < possibleCenters.size() - 1; j++) {
+      distortion = selectBestPatternsRefactoring3(distortion, bestPatterns, i, fpi, minModuleSize);
+    }
+
+    if (distortion == Double.MAX_VALUE) {
+      throw NotFoundException.getNotFoundInstance();
+    }
+
+    return bestPatterns;
+  }
+
+private double selectBestPatternsRefactoring3(double distortion, FinderPattern[] bestPatterns, int i, FinderPattern fpi,
+		float minModuleSize) {
+	for (int j = i + 1; j < possibleCenters.size() - 1; j++) {
         FinderPattern fpj = possibleCenters.get(j);
         double squares0 = squaredDistance(fpi, fpj);
 
@@ -685,22 +721,29 @@ public class FinderPatternFinder {
           // The value of |c^2 - 2 * b^2| + |c^2 - 2 * a^2| increases as dissimilarity
           // from isosceles right triangle.
           double d = Math.abs(c - 2 * b) + Math.abs(c - 2 * a);
-          if (d < distortion) {
-            distortion = d;
-            bestPatterns[0] = fpi;
-            bestPatterns[1] = fpj;
-            bestPatterns[2] = fpk;
-          }
+          distortion = selectBestPatternsRefactoring2(distortion, bestPatterns, fpi, fpj, fpk, d);
         }
       }
-    }
+	return distortion;
+}
 
-    if (distortion == Double.MAX_VALUE) {
+private double selectBestPatternsRefactoring2(double distortion, FinderPattern[] bestPatterns, FinderPattern fpi,
+		FinderPattern fpj, FinderPattern fpk, double d) {
+	if (d < distortion) {
+	    distortion = d;
+	    bestPatterns[0] = fpi;
+	    bestPatterns[1] = fpj;
+	    bestPatterns[2] = fpk;
+	  }
+	return distortion;
+}
+
+private void selectBestPatternsRefactoring1(int startSize) throws NotFoundException {
+	if (startSize < 3) {
+      // Couldn't find enough finder patterns
       throw NotFoundException.getNotFoundInstance();
     }
-
-    return bestPatterns;
-  }
+}
 
   /**
    * <p>Orders by {@link FinderPattern#getEstimatedModuleSize()}</p>

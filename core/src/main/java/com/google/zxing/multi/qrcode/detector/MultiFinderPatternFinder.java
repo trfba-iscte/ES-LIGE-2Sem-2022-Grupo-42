@@ -23,6 +23,7 @@ import com.google.zxing.ResultPointCallback;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.detector.FinderPattern;
 import com.google.zxing.qrcode.detector.FinderPatternFinder;
+import com.google.zxing.qrcode.detector.FinderPatternFinderRefactoring;
 import com.google.zxing.qrcode.detector.FinderPatternInfo;
 
 import java.io.Serializable;
@@ -247,7 +248,7 @@ public final class MultiFinderPatternFinder extends FinderPatternFinder {
         } else { // White pixel
           if ((currentState & 1) == 0) { // Counting black pixels
             if (currentState == 4) { // A winner?
-              if (foundPatternCross(stateCount) && handlePossibleCenter(stateCount, i, j)) { // Yes
+              if (FinderPatternFinderRefactoring.foundPatternCross(stateCount) && handlePossibleCenter(stateCount, i, j)) { // Yes
                 // Clear state to start looking again
                 currentState = 0;
                 doClearCounts(stateCount);
@@ -264,7 +265,7 @@ public final class MultiFinderPatternFinder extends FinderPatternFinder {
         }
       } // for j=...
 
-      if (foundPatternCross(stateCount)) {
+      if (FinderPatternFinderRefactoring.foundPatternCross(stateCount)) {
         handlePossibleCenter(stateCount, i, maxJ);
       }
     } // for i=iSkip-1 ...

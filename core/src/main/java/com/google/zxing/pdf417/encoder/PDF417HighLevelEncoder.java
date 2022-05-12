@@ -183,9 +183,7 @@ final class PDF417HighLevelEncoder {
         encoding = DEFAULT_ENCODING;
       } else if (!DEFAULT_ENCODING.equals(encoding)) {
         CharacterSetECI eci = CharacterSetECI.getCharacterSetECI(encoding);
-        if (eci != null) {
-          encodingECI(eci.getValue(), sb);
-        }
+        encodeHighLevelRefactoring(sb, eci);
       }
     }
 
@@ -199,12 +197,7 @@ final class PDF417HighLevelEncoder {
         encodeText(input, p, len, sb, textSubMode);
         break;
       case BYTE:
-        if (autoECI) {
-          encodeMultiECIBinary(input, 0, input.length(), TEXT_COMPACTION, sb);
-        } else {
-          byte[] msgBytes = input.toString().getBytes(encoding);
-          encodeBinary(msgBytes, p, msgBytes.length, BYTE_COMPACTION, sb);
-        }
+        encodeHighLevelRefactoring(encoding, autoECI, sb, input, p);
         break;
       case NUMERIC:
         sb.append((char) LATCH_TO_NUMERIC);
@@ -212,64 +205,95 @@ final class PDF417HighLevelEncoder {
         break;
       default:
         int encodingMode = TEXT_COMPACTION; //Default mode, see 4.4.2.1
-        while (p < len) {
-          while (p < len && input.isECI(p)) {
-            encodingECI(input.getECIValue(p), sb);
-            p++;
-          }
-          if (p >= len) {
-            break;
-          }
-          int n = determineConsecutiveDigitCount(input, p);
-          if (n >= 13) {
-            sb.append((char) LATCH_TO_NUMERIC);
-            encodingMode = NUMERIC_COMPACTION;
-            textSubMode = SUBMODE_ALPHA; //Reset after latch
-            encodeNumeric(input, p, n, sb);
-            p += n;
-          } else {
-            int t = determineConsecutiveTextCount(input, p);
-            if (t >= 5 || n == len) {
-              if (encodingMode != TEXT_COMPACTION) {
-                sb.append((char) LATCH_TO_TEXT);
-                encodingMode = TEXT_COMPACTION;
-                textSubMode = SUBMODE_ALPHA; //start with submode alpha after latch
-              }
-              textSubMode = encodeText(input, p, t, sb, textSubMode);
-              p += t;
-            } else {
-              int b = determineConsecutiveBinaryCount(input, p, autoECI ? null : encoding);
-              if (b == 0) {
-                b = 1;
-              }
-              byte[] bytes = autoECI ? null : input.subSequence(p, p + b).toString().getBytes(encoding);
-              if (((bytes == null && b == 1) || (bytes != null && bytes.length == 1))
-                  && encodingMode == TEXT_COMPACTION) {
-                //Switch for one byte (instead of latch)
-                if (autoECI) {
-                  encodeMultiECIBinary(input, p, 1, TEXT_COMPACTION, sb);
-                } else {
-                  encodeBinary(bytes, 0, 1, TEXT_COMPACTION, sb);
-                }
-              } else {
-                //Mode latch performed by encodeBinary()
-                if (autoECI) {
-                  encodeMultiECIBinary(input, p, p + b, encodingMode, sb);
-                } else {
-                  encodeBinary(bytes, 0, bytes.length, encodingMode, sb);
-                }
-                encodingMode = BYTE_COMPACTION;
-                textSubMode = SUBMODE_ALPHA; //Reset after latch
-              }
-              p += b;
-            }
-          }
-        }
+        encodeHighLevelRefactoring(encoding, autoECI, sb, input, len, p, textSubMode, encodingMode);
         break;
     }
 
     return sb.toString();
   }
+
+private static void encodeHighLevelRefactoring(Charset encoding, boolean autoECI, StringBuilder sb, ECIInput input,
+		int len, int p, int textSubMode, int encodingMode) throws WriterException {
+	while (p < len) {
+	  p = encodeHighLevelRefactoring(sb, input, len, p);
+	  if (p >= len) {
+	    break;
+	  }
+	  int n = determineConsecutiveDigitCount(input, p);
+	  if (n >= 13) {
+	    sb.append((char) LATCH_TO_NUMERIC);
+	    encodingMode = NUMERIC_COMPACTION;
+	    textSubMode = SUBMODE_ALPHA; //Reset after latch
+	    encodeNumeric(input, p, n, sb);
+	    p += n;
+	  } else {
+	    int t = determineConsecutiveTextCount(input, p);
+	    if (t >= 5 || n == len) {
+	      if (encodingMode != TEXT_COMPACTION) {
+	        sb.append((char) LATCH_TO_TEXT);
+	        encodingMode = TEXT_COMPACTION;
+	        textSubMode = SUBMODE_ALPHA; //start with submode alpha after latch
+	      }
+	      textSubMode = encodeText(input, p, t, sb, textSubMode);
+	      p += t;
+	    } else {
+	      int b = determineConsecutiveBinaryCount(input, p, autoECI ? null : encoding);
+	      b = encodeHighLevelRefactoring(b);
+	      byte[] bytes = autoECI ? null : input.subSequence(p, p + b).toString().getBytes(encoding);
+	      if (((bytes == null && b == 1) || (bytes != null && bytes.length == 1))
+	          && encodingMode == TEXT_COMPACTION) {
+	        //Switch for one byte (instead of latch)
+	        if (autoECI) {
+	          encodeMultiECIBinary(input, p, 1, TEXT_COMPACTION, sb);
+	        } else {
+	          encodeBinary(bytes, 0, 1, TEXT_COMPACTION, sb);
+	        }
+	      } else {
+	        //Mode latch performed by encodeBinary()
+	        if (autoECI) {
+	          encodeMultiECIBinary(input, p, p + b, encodingMode, sb);
+	        } else {
+	          encodeBinary(bytes, 0, bytes.length, encodingMode, sb);
+	        }
+	        encodingMode = BYTE_COMPACTION;
+	        textSubMode = SUBMODE_ALPHA; //Reset after latch
+	      }
+	      p += b;
+	    }
+	  }
+	}
+}
+
+private static int encodeHighLevelRefactoring(StringBuilder sb, ECIInput input, int len, int p) throws WriterException {
+	while (p < len && input.isECI(p)) {
+	    encodingECI(input.getECIValue(p), sb);
+	    p++;
+	  }
+	return p;
+}
+
+private static void encodeHighLevelRefactoring(Charset encoding, boolean autoECI, StringBuilder sb, ECIInput input,
+		int p) throws WriterException {
+	if (autoECI) {
+	  encodeMultiECIBinary(input, 0, input.length(), TEXT_COMPACTION, sb);
+	} else {
+	  byte[] msgBytes = input.toString().getBytes(encoding);
+	  encodeBinary(msgBytes, p, msgBytes.length, BYTE_COMPACTION, sb);
+	}
+}
+
+private static int encodeHighLevelRefactoring(int b) {
+	if (b == 0) {
+	    b = 1;
+	  }
+	return b;
+}
+
+private static void encodeHighLevelRefactoring(StringBuilder sb, CharacterSetECI eci) throws WriterException {
+	if (eci != null) {
+	  encodingECI(eci.getValue(), sb);
+	}
+}
 
   /**
    * Encode parts of the message using Text Compaction as described in ISO/IEC 15438:2001(E),
@@ -290,7 +314,17 @@ final class PDF417HighLevelEncoder {
     StringBuilder tmp = new StringBuilder(count);
     int submode = initialSubmode;
     int idx = 0;
-    while (true) {
+    submode = encodeText(input, startpos, count, sb, tmp, submode, idx);
+    char h = 0;
+    int len = tmp.length();
+    h = encodeText(sb, tmp, h, len);
+    encodeText(sb, h, len);
+    return submode;
+  }
+
+private static int encodeText(ECIInput input, int startpos, int count, StringBuilder sb, StringBuilder tmp, int submode,
+		int idx) throws WriterException {
+	while (true) {
       if (input.isECI(startpos + idx)) {
         encodingECI(input.getECIValue(startpos + idx), sb);
         idx++;
@@ -322,11 +356,7 @@ final class PDF417HighLevelEncoder {
             break;
           case SUBMODE_LOWER:
             if (isAlphaLower(ch)) {
-              if (ch == ' ') {
-                tmp.append((char) 26); //space
-              } else {
-                tmp.append((char) (ch - 97));
-              }
+              encodeText(tmp, ch);
             } else {
               if (isAlphaUpper(ch)) {
                 tmp.append((char) 27); //as
@@ -384,9 +414,19 @@ final class PDF417HighLevelEncoder {
         }
       }
     }
-    char h = 0;
-    int len = tmp.length();
-    for (int i = 0; i < len; i++) {
+	return submode;
+}
+
+private static void encodeText(StringBuilder tmp, char ch) {
+	if (ch == ' ') {
+	    tmp.append((char) 26); //space
+	  } else {
+	    tmp.append((char) (ch - 97));
+	  }
+}
+
+private static char encodeText(StringBuilder sb, StringBuilder tmp, char h, int len) {
+	for (int i = 0; i < len; i++) {
       boolean odd = (i % 2) != 0;
       if (odd) {
         h = (char) ((h * 30) + tmp.charAt(i));
@@ -395,11 +435,14 @@ final class PDF417HighLevelEncoder {
         h = tmp.charAt(i);
       }
     }
-    if ((len % 2) != 0) {
+	return h;
+}
+
+private static void encodeText(StringBuilder sb, char h, int len) {
+	if ((len % 2) != 0) {
       sb.append((char) ((h * 30) + 29)); //ps
     }
-    return submode;
-  }
+}
 
   /**
    * Encode all of the message using Byte Compaction as described in ISO/IEC 15438:2001(E)
@@ -418,11 +461,7 @@ final class PDF417HighLevelEncoder {
     final int end = Math.min(startpos + count, input.length());
     int localStart = startpos;
     while (true) {
-      //encode all leading ECIs and advance localStart
-      while (localStart < end && input.isECI(localStart)) {
-        encodingECI(input.getECIValue(localStart), sb);
-        localStart++;
-      }
+      localStart = encodeHighLevelRefactoring(sb, input, end, localStart);
       int localEnd = localStart;
       //advance end until before the next ECI
       while (localEnd < end && !input.isECI(localEnd)) {

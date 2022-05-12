@@ -90,9 +90,7 @@ public final class Encoder {
     // Determine what character encoding has been specified by the caller, if any
     Charset encoding = DEFAULT_BYTE_MODE_ENCODING;
     boolean hasEncodingHint = hints != null && hints.containsKey(EncodeHintType.CHARACTER_SET);
-    if (hasEncodingHint) {
-      encoding = Charset.forName(hints.get(EncodeHintType.CHARACTER_SET).toString());
-    }
+    encoding = encodeRefactoring1(hints, encoding, hasEncodingHint);
 
     if (hasCompactionHint) {
       mode = Mode.BYTE;
@@ -115,18 +113,10 @@ public final class Encoder {
       BitArray headerBits = new BitArray();
   
       // Append ECI segment if applicable
-      if (mode == Mode.BYTE && hasEncodingHint) {
-        CharacterSetECI eci = CharacterSetECI.getCharacterSetECI(encoding);
-        if (eci != null) {
-          appendECI(eci, headerBits);
-        }
-      }
+      encodeRefactoring3(mode, encoding, hasEncodingHint, headerBits);
   
       // Append the FNC1 mode header for GS1 formatted data if applicable
-      if (hasGS1FormatHint) {
-        // GS1 formatted codes are prefixed with a FNC1 in first position mode header
-        appendModeInfo(Mode.FNC1_FIRST_POSITION, headerBits);
-      }
+      encodeRefactoring4(hasGS1FormatHint, headerBits);
     
       // (With ECI in place,) Write the mode marker
       appendModeInfo(mode, headerBits);
@@ -140,9 +130,7 @@ public final class Encoder {
         int versionNumber = Integer.parseInt(hints.get(EncodeHintType.QR_VERSION).toString());
         version = Version.getVersionForNumber(versionNumber);
         int bitsNeeded = calculateBitsNeeded(mode, headerBits, dataBits, version);
-        if (!willFit(bitsNeeded, version, ecLevel)) {
-          throw new WriterException("Data too big for requested version");
-        }
+        encodeRefactoring5(ecLevel, version, bitsNeeded);
       } else {
         version = recommendVersion(ecLevel, mode, headerBits, dataBits);
       }
@@ -180,14 +168,9 @@ public final class Encoder {
 
     // Enable manual selection of the pattern to be used via hint
     int maskPattern = -1;
-    if (hints != null && hints.containsKey(EncodeHintType.QR_MASK_PATTERN)) {
-      int hintMaskPattern = Integer.parseInt(hints.get(EncodeHintType.QR_MASK_PATTERN).toString());
-      maskPattern = QRCode.isValidMaskPattern(hintMaskPattern) ? hintMaskPattern : -1;
-    }
+    maskPattern = encodeRefactoring7(hints, maskPattern);
 
-    if (maskPattern == -1) {
-      maskPattern = chooseMaskPattern(finalBits, ecLevel, version, matrix);
-    }
+    maskPattern = encodeRefactoring6(ecLevel, version, finalBits, matrix, maskPattern);
     qrCode.setMaskPattern(maskPattern);
 
     // Build the matrix and set it to "qrCode".
@@ -196,6 +179,56 @@ public final class Encoder {
 
     return qrCode;
   }
+
+private static int encodeRefactoring7(Map<EncodeHintType, ?> hints, int maskPattern) {
+	if (hints != null && hints.containsKey(EncodeHintType.QR_MASK_PATTERN)) {
+      int hintMaskPattern = Integer.parseInt(hints.get(EncodeHintType.QR_MASK_PATTERN).toString());
+      maskPattern = QRCode.isValidMaskPattern(hintMaskPattern) ? hintMaskPattern : -1;
+    }
+	return maskPattern;
+}
+
+private static int encodeRefactoring6(ErrorCorrectionLevel ecLevel, Version version, BitArray finalBits,
+		ByteMatrix matrix, int maskPattern) throws WriterException {
+	if (maskPattern == -1) {
+      maskPattern = chooseMaskPattern(finalBits, ecLevel, version, matrix);
+    }
+	return maskPattern;
+}
+
+private static void encodeRefactoring5(ErrorCorrectionLevel ecLevel, Version version, int bitsNeeded)
+		throws WriterException {
+	if (!willFit(bitsNeeded, version, ecLevel)) {
+	  throw new WriterException("Data too big for requested version");
+	}
+}
+
+private static void encodeRefactoring4(boolean hasGS1FormatHint, BitArray headerBits) {
+	if (hasGS1FormatHint) {
+        // GS1 formatted codes are prefixed with a FNC1 in first position mode header
+        appendModeInfo(Mode.FNC1_FIRST_POSITION, headerBits);
+      }
+}
+
+private static void encodeRefactoring3(Mode mode, Charset encoding, boolean hasEncodingHint, BitArray headerBits) {
+	if (mode == Mode.BYTE && hasEncodingHint) {
+        CharacterSetECI eci = CharacterSetECI.getCharacterSetECI(encoding);
+        encodeRefactoring2(headerBits, eci);
+      }
+}
+
+private static void encodeRefactoring2(BitArray headerBits, CharacterSetECI eci) {
+	if (eci != null) {
+	  appendECI(eci, headerBits);
+	}
+}
+
+private static Charset encodeRefactoring1(Map<EncodeHintType, ?> hints, Charset encoding, boolean hasEncodingHint) {
+	if (hasEncodingHint) {
+      encoding = Charset.forName(hints.get(EncodeHintType.CHARACTER_SET).toString());
+    }
+	return encoding;
+}
 
   /**
    * Decides the smallest version of QR code that will contain all of the provided data.
@@ -428,9 +461,7 @@ public final class Encoder {
                                         int numRSBlocks) throws WriterException {
 
     // "bits" must have "getNumDataBytes" bytes of data.
-    if (bits.getSizeInBytes() != numDataBytes) {
-      throw new WriterException("Number of bits and data bytes does not match");
-    }
+    interleaveWithECBytesRefactoring1(bits, numDataBytes);
 
     // Step 1.  Divide data bytes into blocks and generate error correction bytes for them. We'll
     // store the divided data bytes blocks and error correction bytes blocks into "blocks".
@@ -489,6 +520,12 @@ public final class Encoder {
 
     return result;
   }
+
+private static void interleaveWithECBytesRefactoring1(BitArray bits, int numDataBytes) throws WriterException {
+	if (bits.getSizeInBytes() != numDataBytes) {
+      throw new WriterException("Number of bits and data bytes does not match");
+    }
+}
 
   static byte[] generateECBytes(byte[] dataBytes, int numEcBytesInBlock) {
     int numDataBytes = dataBytes.length;

@@ -1,11 +1,10 @@
-/*
- * Copyright 2007 ZXing authors
+/* Copyright 2007 ZXing authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ /*      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -109,11 +108,7 @@ final class BitMatrixParser {
     // Read top-right version info: 3 wide by 6 tall
     int versionBits = 0;
     int ijMin = dimension - 11;
-    for (int j = 5; j >= 0; j--) {
-      for (int i = dimension - 9; i >= ijMin; i--) {
-        versionBits = copyBit(i, j, versionBits);
-      }
-    }
+    versionBits = extractPureBitsRefactoring(dimension, versionBits, ijMin);
 
     Version theParsedVersion = Version.decodeVersionInformation(versionBits);
     if (theParsedVersion != null && theParsedVersion.getDimensionForVersion() == dimension) {
@@ -136,6 +131,15 @@ final class BitMatrixParser {
     }
     throw FormatException.getFormatInstance();
   }
+
+private int extractPureBitsRefactoring(int dimension, int versionBits, int ijMin) {
+	for (int j = 5; j >= 0; j--) {
+      for (int i = dimension - 9; i >= ijMin; i--) {
+        versionBits = copyBit(i, j, versionBits);
+      }
+    }
+	return versionBits;
+}
 
   private int copyBit(int i, int j, int versionBits) {
     boolean bit = mirror ? bitMatrix.get(j, i) : bitMatrix.get(i, j);
