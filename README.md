@@ -20,4 +20,4 @@ ES-LIGE-2Sem-2022-Grupo-42
 #identificação e descrição de erros e funcionalidades não implementadas ou incompletas
 
 
-
+N/A
