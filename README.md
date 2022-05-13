@@ -2,11 +2,14 @@
 #identificação do grupo
 
 
-#ES-LIGE-2Sem-2022-Grupo-42
+ES-LIGE-2Sem-2022-Grupo-42
 
 
 
 #identificação dos membros do grupo (nome e número)
+
+
+
 92671	Carlota Gonçalves
 92733	Maria Santos
 92401	Miriam Rodrigues
