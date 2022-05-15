@@ -174,14 +174,10 @@ final class MinimalEncoder {
     return Encoder.isOnlyDoubleByteKanji(String.valueOf(c));
   }
 
-  static boolean isAlphanumeric(char c) {
-    return Encoder.getAlphanumericCode(c) != -1;
-  }
-
   boolean canEncode(Mode mode, char c) {
     switch (mode) {
       case KANJI: return isDoubleByteKanji(c);
-      case ALPHANUMERIC: return isAlphanumeric(c);
+      case ALPHANUMERIC: return MinimalEncoderRefactoring.isAlphanumeric(c);
       case NUMERIC: return isNumeric(c);
       case BYTE: return true; // any character can be encoded as byte(s). Up to the caller to manage splitting into
                               // multiple bytes when String.getBytes(Charset) return more than one byte.
@@ -226,11 +222,7 @@ final class MinimalEncoder {
       end = priorityEncoderIndex + 1;
     }
 
-    for (int i = start; i < end; i++) {
-      if (encoders.canEncode(stringToEncode.charAt(from), i)) {
-        addEdge(edges, from, new Edge(Mode.BYTE, from, i, 1, previous, version));
-      }
-    }
+    addEdgesRefactoring(version, edges, from, previous, start, end);
 
     if (canEncode(Mode.KANJI, stringToEncode.charAt(from))) {
       addEdge(edges, from, new Edge(Mode.KANJI, from, 0, 1, previous, version));
@@ -248,6 +240,14 @@ final class MinimalEncoder {
           !canEncode(Mode.NUMERIC, stringToEncode.charAt(from + 2)) ? 2 : 3, previous, version));
     }
   }
+
+private void addEdgesRefactoring(Version version, Edge[][][] edges, int from, Edge previous, int start, int end) {
+	for (int i = start; i < end; i++) {
+      if (encoders.canEncode(stringToEncode.charAt(from), i)) {
+        addEdge(edges, from, new Edge(Mode.BYTE, from, i, 1, previous, version));
+      }
+    }
+}
   ResultList encodeSpecificVersion(Version version) throws WriterException {
 
     @SuppressWarnings("checkstyle:lineLength")
@@ -371,16 +371,7 @@ final class MinimalEncoder {
     Edge[][][] edges = new Edge[inputLength + 1][encoders.length()][4];
     addEdges(version, edges, 0, null);
 
-    for (int i = 1; i <= inputLength; i++) {
-      for (int j = 0; j < encoders.length(); j++) {
-        for (int k = 0; k < 4; k++) {
-          if (edges[i][j][k] != null && i < inputLength) {
-            addEdges(version, edges, i, edges[i][j][k]);
-          }
-        }
-      }
-
-    }
+    encodeSpecificVersionRefactoring(version, inputLength, edges);
     int minimalJ = -1;
     int minimalK = -1;
     int minimalSize = Integer.MAX_VALUE;
@@ -401,6 +392,19 @@ final class MinimalEncoder {
     }
     return new ResultList(version, edges[inputLength][minimalJ][minimalK]);
   }
+
+private void encodeSpecificVersionRefactoring(Version version, int inputLength, Edge[][][] edges) {
+	for (int i = 1; i <= inputLength; i++) {
+      for (int j = 0; j < encoders.length(); j++) {
+        for (int k = 0; k < 4; k++) {
+          if (edges[i][j][k] != null && i < inputLength) {
+            addEdges(version, edges, i, edges[i][j][k]);
+          }
+        }
+      }
+
+    }
+}
 
   private final class Edge {
     private final Mode mode;

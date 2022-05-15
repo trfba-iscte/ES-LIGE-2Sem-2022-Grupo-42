@@ -233,28 +233,7 @@ final class MatrixUtil {
         x -= 1;
       }
       while (y >= 0 && y < matrix.getHeight()) {
-        for (int i = 0; i < 2; ++i) {
-          int xx = x - i;
-          // Skip the cell if it's not empty.
-          if (!isEmpty(matrix.get(xx, y))) {
-            continue;
-          }
-          boolean bit;
-          if (bitIndex < dataBits.getSize()) {
-            bit = dataBits.get(bitIndex);
-            ++bitIndex;
-          } else {
-            // Padding bit. If there is no bit left, we'll fill the left cells with 0, as described
-            // in 8.4.9 of JISX0510:2004 (p. 24).
-            bit = false;
-          }
-
-          // Skip masking if mask_pattern is -1.
-          if (maskPattern != -1 && MaskUtil.getDataMaskBit(maskPattern, xx, y)) {
-            bit = !bit;
-          }
-          matrix.set(xx, y, bit);
-        }
+        bitIndex = embedDataBitsRefactoring1(dataBits, maskPattern, matrix, bitIndex, x, y);
         y += direction;
       }
       direction = -direction;  // Reverse the direction.
@@ -266,6 +245,33 @@ final class MatrixUtil {
       throw new WriterException("Not all bits consumed: " + bitIndex + '/' + dataBits.getSize());
     }
   }
+
+private static int embedDataBitsRefactoring1(BitArray dataBits, int maskPattern, ByteMatrix matrix, int bitIndex, int x,
+		int y) {
+	for (int i = 0; i < 2; ++i) {
+	  int xx = x - i;
+	  // Skip the cell if it's not empty.
+	  if (!isEmpty(matrix.get(xx, y))) {
+	    continue;
+	  }
+	  boolean bit;
+	  if (bitIndex < dataBits.getSize()) {
+	    bit = dataBits.get(bitIndex);
+	    ++bitIndex;
+	  } else {
+	    // Padding bit. If there is no bit left, we'll fill the left cells with 0, as described
+	    // in 8.4.9 of JISX0510:2004 (p. 24).
+	    bit = false;
+	  }
+
+	  // Skip masking if mask_pattern is -1.
+	  if (maskPattern != -1 && MaskUtil.getDataMaskBit(maskPattern, xx, y)) {
+	    bit = !bit;
+	  }
+	  matrix.set(xx, y, bit);
+	}
+	return bitIndex;
+}
 
   // Return the position of the most significant bit set (to one) in the "value". The most
   // significant bit is position 32. If there is no bit set, return 0. Examples:

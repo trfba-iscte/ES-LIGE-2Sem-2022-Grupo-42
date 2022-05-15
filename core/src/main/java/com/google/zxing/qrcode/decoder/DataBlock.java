@@ -48,9 +48,7 @@ final class DataBlock {
                                    Version version,
                                    ErrorCorrectionLevel ecLevel) {
 
-    if (rawCodewords.length != version.getTotalCodewords()) {
-      throw new IllegalArgumentException();
-    }
+    getDataBlocksRefactoring(rawCodewords, version);
 
     // Figure out the number and size of data blocks used by this version and
     // error correction level
@@ -59,20 +57,12 @@ final class DataBlock {
     // First count the total number of data blocks
     int totalBlocks = 0;
     Version.ECB[] ecBlockArray = ecBlocks.getECBlocks();
-    for (Version.ECB ecBlock : ecBlockArray) {
-      totalBlocks += ecBlock.getCount();
-    }
+    totalBlocks = getDataBlocksRefactoring2(totalBlocks, ecBlockArray);
 
     // Now establish DataBlocks of the appropriate size and number of data codewords
     DataBlock[] result = new DataBlock[totalBlocks];
     int numResultBlocks = 0;
-    for (Version.ECB ecBlock : ecBlockArray) {
-      for (int i = 0; i < ecBlock.getCount(); i++) {
-        int numDataCodewords = ecBlock.getDataCodewords();
-        int numBlockCodewords = ecBlocks.getECCodewordsPerBlock() + numDataCodewords;
-        result[numResultBlocks++] = new DataBlock(numDataCodewords, new byte[numBlockCodewords]);
-      }
-    }
+    numResultBlocks = getDataBlocksRefactoring3(ecBlocks, ecBlockArray, result, numResultBlocks);
 
     // All blocks have the same amount of data, except that the last n
     // (where n may be 0) have 1 more byte. Figure out where these start.
@@ -110,6 +100,31 @@ final class DataBlock {
     }
     return result;
   }
+
+private static int getDataBlocksRefactoring3(Version.ECBlocks ecBlocks, Version.ECB[] ecBlockArray, DataBlock[] result,
+		int numResultBlocks) {
+	for (Version.ECB ecBlock : ecBlockArray) {
+      for (int i = 0; i < ecBlock.getCount(); i++) {
+        int numDataCodewords = ecBlock.getDataCodewords();
+        int numBlockCodewords = ecBlocks.getECCodewordsPerBlock() + numDataCodewords;
+        result[numResultBlocks++] = new DataBlock(numDataCodewords, new byte[numBlockCodewords]);
+      }
+    }
+	return numResultBlocks;
+}
+
+private static int getDataBlocksRefactoring2(int totalBlocks, Version.ECB[] ecBlockArray) {
+	for (Version.ECB ecBlock : ecBlockArray) {
+      totalBlocks += ecBlock.getCount();
+    }
+	return totalBlocks;
+}
+
+private static void getDataBlocksRefactoring(byte[] rawCodewords, Version version) {
+	if (rawCodewords.length != version.getTotalCodewords()) {
+      throw new IllegalArgumentException();
+    }
+}
 
   int getNumDataCodewords() {
     return numDataCodewords;

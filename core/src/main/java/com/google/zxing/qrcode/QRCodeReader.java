@@ -1,5 +1,4 @@
-/*
- * Copyright 2007 ZXing authors
+/* Copyright 2007 ZXing authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,9 +117,7 @@ public class QRCodeReader implements Reader {
 
     int[] leftTopBlack = image.getTopLeftOnBit();
     int[] rightBottomBlack = image.getBottomRightOnBit();
-    if (leftTopBlack == null || rightBottomBlack == null) {
-      throw NotFoundException.getNotFoundInstance();
-    }
+    extractPureBitsRefactoring(leftTopBlack, rightBottomBlack);
 
     float moduleSize = moduleSize(leftTopBlack, image);
 
@@ -130,25 +127,13 @@ public class QRCodeReader implements Reader {
     int right = rightBottomBlack[0];
 
     // Sanity check!
-    if (left >= right || top >= bottom) {
-      throw NotFoundException.getNotFoundInstance();
-    }
+    extractPureBitsRefactoring2(top, bottom, left, right);
 
-    if (bottom - top != right - left) {
-      // Special case, where bottom-right module wasn't black so we found something else in the last row
-      // Assume it's a square, so use height as the width
-      right = left + (bottom - top);
-      if (right >= image.getWidth()) {
-        // Abort if that would not make sense -- off image
-        throw NotFoundException.getNotFoundInstance();
-      }
-    }
+    right = extractPureBitsRefactoring4(image, top, bottom, left, right);
 
     int matrixWidth = Math.round((right - left + 1) / moduleSize);
     int matrixHeight = Math.round((bottom - top + 1) / moduleSize);
-    if (matrixWidth <= 0 || matrixHeight <= 0) {
-      throw NotFoundException.getNotFoundInstance();
-    }
+    extractPureBitsRefactoring5(matrixWidth, matrixHeight);
     if (matrixHeight != matrixWidth) {
       // Only possibly decode square regions
       throw NotFoundException.getNotFoundInstance();
@@ -194,6 +179,42 @@ public class QRCodeReader implements Reader {
     }
     return bits;
   }
+
+private static void extractPureBitsRefactoring5(int matrixWidth, int matrixHeight) throws NotFoundException {
+	if (matrixWidth <= 0 || matrixHeight <= 0) {
+      throw NotFoundException.getNotFoundInstance();
+    }
+}
+
+private static int extractPureBitsRefactoring4(BitMatrix image, int top, int bottom, int left, int right)
+		throws NotFoundException {
+	if (bottom - top != right - left) {
+      // Special case, where bottom-right module wasn't black so we found something else in the last row
+      // Assume it's a square, so use height as the width
+      right = left + (bottom - top);
+      extractPureBitsRefactoring3(image, right);
+    }
+	return right;
+}
+
+private static void extractPureBitsRefactoring3(BitMatrix image, int right) throws NotFoundException {
+	if (right >= image.getWidth()) {
+        // Abort if that would not make sense -- off image
+        throw NotFoundException.getNotFoundInstance();
+      }
+}
+
+private static void extractPureBitsRefactoring2(int top, int bottom, int left, int right) throws NotFoundException {
+	if (left >= right || top >= bottom) {
+      throw NotFoundException.getNotFoundInstance();
+    }
+}
+
+private static void extractPureBitsRefactoring(int[] leftTopBlack, int[] rightBottomBlack) throws NotFoundException {
+	if (leftTopBlack == null || rightBottomBlack == null) {
+      throw NotFoundException.getNotFoundInstance();
+    }
+}
 
   private static float moduleSize(int[] leftTopBlack, BitMatrix image) throws NotFoundException {
     int height = image.getHeight();

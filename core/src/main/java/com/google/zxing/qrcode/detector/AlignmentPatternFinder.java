@@ -102,9 +102,7 @@ final class AlignmentPatternFinder {
       // Burn off leading white pixels before anything else; if we start in the middle of
       // a white run, it doesn't make sense to count its length, since we don't know if the
       // white run continued to the left of the start point
-      while (j < maxJ && !image.get(j, i)) {
-        j++;
-      }
+      j = findRefactoring1(maxJ, i, j);
       int currentState = 0;
       while (j < maxJ) {
         if (image.get(j, i)) {
@@ -153,6 +151,13 @@ final class AlignmentPatternFinder {
     throw NotFoundException.getNotFoundInstance();
   }
 
+private int findRefactoring1(int maxJ, int i, int j) {
+	while (j < maxJ && !image.get(j, i)) {
+        j++;
+      }
+	return j;
+}
+
   /**
    * Given a count of black/white/black pixels just seen and an end position,
    * figures the location of the center of this black/white/black run.
@@ -200,18 +205,12 @@ final class AlignmentPatternFinder {
 
     // Start counting up from center
     int i = startI;
-    while (i >= 0 && image.get(centerJ, i) && stateCount[1] <= maxCount) {
-      stateCount[1]++;
-      i--;
-    }
+    i = crossCheckVerticalRefactoring1(centerJ, maxCount, image, stateCount, i);
     // If already too many modules in this state or ran off the edge:
     if (i < 0 || stateCount[1] > maxCount) {
       return Float.NaN;
     }
-    while (i >= 0 && !image.get(centerJ, i) && stateCount[0] <= maxCount) {
-      stateCount[0]++;
-      i--;
-    }
+    crossCheckVerticalRefactoring2(centerJ, maxCount, image, stateCount, i);
     if (stateCount[0] > maxCount) {
       return Float.NaN;
     }
@@ -240,6 +239,21 @@ final class AlignmentPatternFinder {
 
     return foundPatternCross(stateCount) ? centerFromEnd(stateCount, i) : Float.NaN;
   }
+
+private void crossCheckVerticalRefactoring2(int centerJ, int maxCount, BitMatrix image, int[] stateCount, int i) {
+	while (i >= 0 && !image.get(centerJ, i) && stateCount[0] <= maxCount) {
+      stateCount[0]++;
+      i--;
+    }
+}
+
+private int crossCheckVerticalRefactoring1(int centerJ, int maxCount, BitMatrix image, int[] stateCount, int i) {
+	while (i >= 0 && image.get(centerJ, i) && stateCount[1] <= maxCount) {
+      stateCount[1]++;
+      i--;
+    }
+	return i;
+}
 
   /**
    * <p>This is called when a horizontal scan finds a possible alignment pattern. It will
