@@ -7,7 +7,7 @@ public class FinderPatternFinderRefactoring {
 	   * @return true iff the proportions of the counts is close enough to the 1/1/3/1/1 ratios
 	   *         used by finder patterns to be considered a match
 	   */
-	  protected static boolean foundPatternCross(int[] stateCount) {
+	  public static boolean foundPatternCross(int[] stateCount) {
 	    int totalModuleSize = 0;
 	    for (int i = 0; i < 5; i++) {
 	      int count = stateCount[i];
